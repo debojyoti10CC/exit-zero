@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { World } from "./world";
+import type { ContractResult } from "./contracts";
 
 export interface Toast {
   id: number;
@@ -24,6 +25,9 @@ export interface HudState {
   feed: FeedLine[];
   inventoryOpen: boolean;
   paused: boolean;
+  contracts: ContractResult[];
+  streak: number;
+  death: { lost: number; portalTiles: number; portalsOpen: boolean } | null;
   revision: number;
 }
 
@@ -36,6 +40,9 @@ let state: HudState = {
   feed: [],
   inventoryOpen: false,
   paused: false,
+  contracts: [],
+  streak: 0,
+  death: null,
   revision: 0,
 };
 const subs = new Set<() => void>();
@@ -58,7 +65,7 @@ export const hud = {
     setTimeout(() => hud.set({ feed: state.feed.filter((x) => x.id !== id) }), 7000);
   },
   reset() {
-    state = { ...state, world: null, toasts: [], feed: [], extractPct: 0, nearPrompt: null, inventoryOpen: false, paused: false };
+    state = { ...state, world: null, toasts: [], feed: [], extractPct: 0, nearPrompt: null, inventoryOpen: false, paused: false, contracts: [], streak: 0, death: null };
     subs.forEach((s) => s());
   },
   subscribe(cb: () => void) {

@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { makeAnims, makeTextures, registerAtlas } from "./textures";
 import { sfx } from "./audio";
 import { hud, minimap } from "./hudStore";
+import { ContractTracker } from "./contracts";
 import type { GameSession, Snapshot } from "./session";
 import {
   World, Player, Monster, Drop, isWall, MAP_W, MAP_H, TILE, U2PX, PX, CLASSES, MON, PROJ, ITEM, CHEST, CHEST_STATE, PS, PHASE, EV, MS,
@@ -138,6 +139,9 @@ export class GameScene extends Phaser.Scene {
   dodgeUntil = 0;
   hitStop = 0;
   rivalToast: number[] = [0, 0, 0, 0];
+  contracts: ContractTracker | null = null;
+  lastLoot = 0;
+  lastPos = { x: 0, y: 0 };
   endNotified = false;
   endTimer = 0;
   lastHud = 0;
@@ -283,6 +287,7 @@ export class GameScene extends Phaser.Scene {
     const w = s.world;
     if (!this.built && w.phase >= PHASE.RUNNING && w.roomCount > 0) {
       this.buildMap(w);
+      this.contracts = new ContractTracker(w.seed[0] | (w.seed[1] << 8) | (w.seed[2] << 16) | (w.nonce << 3));
       this.lastSeq = w.eventCount - 1;
       this.built = true;
     }
@@ -594,6 +599,20 @@ export class GameScene extends Phaser.Scene {
     const Y = px(e.y);
     const pan = this.pan(e.x);
     const audible = this.near(e.x, e.y, 220);
+    const finished = this.contracts?.onEvent(e, w, me);
+    if (finished) {
+      sfx.potion();
+      hud.toast({ title: "CONTRACT COMPLETE", sub: finished, color: "#5fd16b" }, 2400);
+    }
+    if (e.kind === EV.MON_DIE && e.b === me && this.contracts) {
+      const n = this.contracts.counts.streak;
+      if (n >= 2) {
+        const names = ["", "", "DOUBLE KILL", "TRIPLE KILL", "RAMPAGE", "MASSACRE", "UNSTOPPABLE"];
+        hud.toast({ title: names[Math.min(n, 6)], sub: `${n} in a row`, color: n >= 4 ? "#ff6a3a" : "#ffcf5a" }, 1300);
+        sfx.pickup(Math.min(4, n));
+      }
+      hud.set({ streak: n });
+    }
     switch (e.kind) {
       case EV.HIT_MON: {
         const v = this.monsters[e.a];
@@ -647,6 +666,9 @@ export class GameScene extends Phaser.Scene {
         hud.feed(`${victim} was slain by ${by}`);
         this.burst(X, Y - 8, 0xb01020, 30, 50);
         if (e.a === me) {
+          let best = 1e9;
+          for (const p of w.portals) if (p.tx || p.ty) best = Math.min(best, Math.hypot(p.tx * TILE + 128 - e.x, p.ty * TILE + 128 - e.y));
+          hud.set({ death: { lost: this.lastLoot, portalTiles: Math.round(best / TILE), portalsOpen: portalsOpen(w) } });
           sfx.playerDie();
           this.cameras.main.shake(400, 0.01);
           hud.toast({ title: "YOU DIED", sub: "Your unbanked loot lies on the floor", color: "#ff3046", big: true }, 3500);
@@ -1648,7 +1670,8 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
-    hud.set({ world: w, me: this.me, nearPrompt: prompt, extractPct: me.extract / EXTRACT_TICKS });
+    if (me.state === PS.ALIVE) this.lastLoot = lootValue(me);
+    hud.set({ world: w, me: this.me, nearPrompt: prompt, extractPct: me.extract / EXTRACT_TICKS, contracts: this.contracts ? this.contracts.results(w, this.me) : [] });
   }
 
   drawMinimap(w: World) {

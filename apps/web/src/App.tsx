@@ -6,6 +6,8 @@ import type { Keypair } from "@solana/web3.js";
 import Phaser from "phaser";
 import { CryptScene } from "./ui/CryptScene";
 import { Title, HeroSelect, PracticeSetup, ResultsScroll, type TitlePick } from "./ui/Screens";
+import { awardRun, type RunAward } from "./game/progress";
+import type { ContractResult } from "./game/contracts";
 import { Sprite, ItemIcon, HERO_SPRITES } from "./ui/Sprites";
 import { Hud } from "./ui/Hud";
 import { createGame } from "./game/GameScene";
@@ -52,7 +54,12 @@ export function App() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [name, setName] = useState(() => LS.get("exitzero.name", ""));
   const [cls, setCls] = useState(() => Number(LS.get("exitzero.class", "0")));
-  const [session, setSession] = useState<GameSession | null>(null);
+  const [session, setSessionRaw] = useState<GameSession | null>(null);
+  const [runId, setRunId] = useState(0);
+  const setSession = (s: GameSession | null) => {
+    setSessionRaw(s);
+    if (s) setRunId((n) => n + 1);
+  };
   const [member, setMember] = useState<Membership | null>(null);
   const wallet = useWallet();
   const guest = useMemo(() => guestKeypair(), []);
@@ -75,7 +82,10 @@ export function App() {
     setScreen(s);
   };
 
+  const lastPractice = useRef<{ bots: number; quick: boolean }>({ bots: 3, quick: true });
   const startPractice = async (bots: number, quick: boolean) => {
+    lastPractice.current = { bots, quick };
+    session?.destroy();
     const s = await PracticeSession.create(cls, name || CLASSES[cls].name, bots, quick);
     hud.reset();
     setSession(s);
@@ -142,7 +152,15 @@ export function App() {
           }}
         />
       )}
-      {screen === "game" && session && <GameView session={session} onExit={leaveGame} member={member} />}
+      {screen === "game" && session && (
+        <GameView
+          key={runId}
+          session={session}
+          onExit={leaveGame}
+          member={member}
+          onAgain={session.mode === "practice" ? () => startPractice(lastPractice.current.bots, lastPractice.current.quick) : undefined}
+        />
+      )}
       {screen === "hall" && <Hall go={go} identity={identity} />}
       {screen === "vault" && <Vault go={go} identity={identity} />}
       {screen === "howto" && <HowTo go={go} />}
@@ -424,14 +442,17 @@ function Lobby({ member, identity, cls, setCls, onLeave, onEnter }: { member: Me
 
 // ---------------------------------------------------------------------------
 
-function GameView({ session, onExit, member }: { session: GameSession; onExit: () => void; member: Membership | null }) {
+function GameView({ session, onExit, member, onAgain }: { session: GameSession; onExit: () => void; member: Membership | null; onAgain?: () => void }) {
   const host = useRef<HTMLDivElement>(null);
-  const [result, setResult] = useState<{ w: World; me: number } | null>(null);
+  const [result, setResult] = useState<{ w: World; me: number; award: RunAward; contracts: ContractResult[]; death: ReturnType<typeof hud.get>["death"] } | null>(null);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const game: Phaser.Game = createGame(host.current!, session, {
-      onEnd: (w, me) => setResult({ w, me }),
+      onEnd: (w, me) => {
+        const contracts = hud.get().contracts;
+        setResult({ w, me, award: awardRun(w, me, contracts), contracts, death: hud.get().death });
+      },
       onPauseToggle: () => setPaused((p) => !p),
     });
     return () => game.destroy(true);
@@ -490,7 +511,7 @@ function GameView({ session, onExit, member }: { session: GameSession; onExit: (
           </div>
         </div>
       )}
-      {result && <ResultsScroll world={live || result.w} me={result.me} session={session} settle={settle} onExit={onExit} />}
+      {result && <ResultsScroll world={live || result.w} me={result.me} session={session} settle={settle} onExit={onExit} onAgain={onAgain} award={result.award} contracts={result.contracts} death={result.death} />}
     </div>
   );
 }

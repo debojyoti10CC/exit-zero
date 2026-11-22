@@ -152,6 +152,22 @@ export function Hud({ session }: { session: GameSession }) {
             ),
           )}
         </div>
+        {h.contracts.length > 0 && (
+          <div className="contracts">
+            <div className="ct-head">CONTRACTS</div>
+            {h.contracts.map((c) => {
+              const reached = c.value >= c.target;
+              const pending = reached && !c.done;
+              return (
+                <div key={c.id} className={`ct ${c.done ? "done" : pending ? "pending" : ""}`}>
+                  <span className="box">{c.done ? "✓" : ""}</span>
+                  <span className="nm">{c.title}</span>
+                  <span className="pr">{c.done ? `+${c.xp}` : pending ? "escape!" : c.target > 1 ? `${c.value}/${c.target}` : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <ChainBox session={session} />
       </div>
 

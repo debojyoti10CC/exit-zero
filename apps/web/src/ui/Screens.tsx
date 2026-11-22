@@ -6,6 +6,8 @@ import {
 } from "../game/world";
 import type { GameSession } from "../game/session";
 import { erExplorer, accountExplorer } from "../chain/config";
+import { levelInfo, loadProgress, type RunAward } from "../game/progress";
+import type { ContractResult } from "../game/contracts";
 
 /** Keyboard + mouse driven vertical menu with a ▶ cursor. */
 export function RpgMenu({ items, onPick, autoFocus = true }: { items: { label: string; hint?: string; disabled?: boolean }[]; onPick: (i: number) => void; autoFocus?: boolean }) {
@@ -114,7 +116,7 @@ export function Title({ name, cls, onPick }: { name: string; cls: number; onPick
                 {name || "Nameless"}
               </div>
               <div className="hero-role">{CLASSES[cls].name}</div>
-              <div className="muted small">HP {CLASSES[cls].hp} · {CLASSES[cls].special}</div>
+              <LevelBadge />
             </div>
           </div>
         </div>
@@ -318,13 +320,17 @@ function useCountUp(target: number, ms = 1200) {
 }
 
 export function ResultsScroll({
-  world, me, session, settle, onExit,
+  world, me, session, settle, onExit, onAgain, award, contracts, death,
 }: {
   world: World;
   me: number;
   session: GameSession;
   settle: { sig: string | null; err: string | null };
   onExit: () => void;
+  onAgain?: () => void;
+  award: RunAward | null;
+  contracts: ContractResult[];
+  death: { lost: number; portalTiles: number; portalsOpen: boolean } | null;
 }) {
   const p = world.players[me];
   const extracted = p.state === PS.EXTRACTED;
@@ -355,6 +361,18 @@ export function ResultsScroll({
             {extracted ? "EXTRACTED" : "ELIMINATED"}
           </h1>
           <div className="result-sub">{extracted ? "You escaped the Forgotten Crypt with your haul." : "Your pack spilled on the crypt floor. Someone else may carry it out."}</div>
+          {!extracted && death && death.lost > 0 && (
+            <div className="recap">
+              {death.portalsOpen
+                ? `You fell ${death.portalTiles} tiles from a portal, carrying ${death.lost} gold.`
+                : `You fell carrying ${death.lost} gold. The portals had not opened yet.`}
+            </div>
+          )}
+          {award?.newRecord && (
+            <div style={{ marginTop: 8 }}>
+              <span className="record">NEW PERSONAL BEST</span>
+            </div>
+          )}
         </div>
 
         <div className="res-grid">
@@ -412,6 +430,7 @@ export function ResultsScroll({
           </div>
         </div>
 
+        {award && <XpPanel award={award} contracts={contracts} />}
         <div className="rule" />
         <table className="t">
           <thead>
@@ -482,12 +501,103 @@ export function ResultsScroll({
 
         <div className="row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
           {session.mode === "online" && world.phase !== PHASE.ENDED && <span className="muted small grow">Others are still inside. Standings update live.</span>}
-          <button className="btn primary" onClick={onExit}>
-            {session.mode === "practice" ? "Return" : "Back to lobby"}
+          <button className={`btn ${onAgain ? "" : "primary"}`} onClick={onExit}>
+            {session.mode === "practice" ? "Menu" : "Back to lobby"}
           </button>
+          {onAgain && (
+            <button className="btn primary" onClick={onAgain} autoFocus>
+              Descend again
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
+
+
+/** Level, title and XP bar for the title-screen card. */
+export function LevelBadge() {
+  const p = loadProgress();
+  const li = levelInfo(p.xp);
+  return (
+    <div className="col" style={{ gap: 2 }}>
+      <div className="small muted">{li.title}</div>
+      <div className="lvl">
+        <span className="n">LV {li.level}</span>
+        <div className="xpbar">
+          <div style={{ width: `${Math.round(li.pct * 100)}%` }} />
+        </div>
+      </div>
+      <div className="mono" style={{ fontSize: 8, color: "var(--stone3)" }}>
+        BEST {p.bestBank} · RUNS {p.runs}
+        {p.streak > 1 ? ` · STREAK ${p.streak}` : ""}
+      </div>
+    </div>
+  );
+}
+
+function XpPanel({ award, contracts }: { award: RunAward; contracts: ContractResult[] }) {
+  const before = levelInfo(award.before);
+  const after = levelInfo(award.after);
+  const [pct, setPct] = useState(before.pct);
+  const [lv, setLv] = useState(before.level);
+  useEffect(() => {
+    // Fill the bar; if we levelled, fill to the end first, then restart.
+    const t1 = setTimeout(() => setPct(award.levelsGained > 0 ? 1 : after.pct), 400);
+    const t2 =
+      award.levelsGained > 0
+        ? setTimeout(() => {
+            setLv(after.level);
+            setPct(0);
+            sfx.legendary();
+            setTimeout(() => setPct(after.pct), 120);
+          }, 1300)
+        : 0;
+    return () => {
+      clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+  }, []);
+  return (
+    <div className="xp-panel">
+      <div className="rule" />
+      <div className="res-grid" style={{ marginTop: 0 }}>
+        <div>
+          <div className="gold-label" style={{ marginBottom: 6 }}>
+            CONTRACTS
+          </div>
+          {contracts.map((c) => (
+            <div key={c.id} className={`ct ${c.done ? "done" : ""}`}>
+              <span className="box">{c.done ? "✓" : ""}</span>
+              <span className="nm">{c.title}</span>
+            </div>
+          ))}
+        </div>
+        <div>
+          {award.lines.map((l, i) => (
+            <div key={i} className="xp-line" style={{ animationDelay: `${i * 90}ms` }}>
+              <span>{l.label}</span>
+              <b>+{l.xp} XP</b>
+            </div>
+          ))}
+          <div className="lvl" style={{ marginTop: 8 }}>
+            <span className="n">LV {lv}</span>
+            <div className="xpbar">
+              <div style={{ width: `${Math.round(pct * 100)}%`, transition: "width 0.8s steps(12)" }} />
+            </div>
+            <span className="mono violet" style={{ fontSize: 8 }}>
+              +{award.total} XP
+            </span>
+          </div>
+          {award.levelsGained > 0 && lv === after.level && (
+            <div className="levelup" style={{ marginTop: 6 }}>
+              LEVEL UP — {after.title.toUpperCase()}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
