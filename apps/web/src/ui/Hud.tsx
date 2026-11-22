@@ -70,6 +70,8 @@ export function Hud({ session }: { session: GameSession }) {
   const h = useHud();
   const [bigMap, setBigMap] = useState(false);
   const ghostHp = useRef(1);
+  const lastLoot = useRef(0);
+  const [gain, setGain] = useState<{ v: number; id: number } | null>(null);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.key === "m" || e.key === "M") setBigMap((b) => !b);
@@ -90,6 +92,11 @@ export function Hud({ session }: { session: GameSession }) {
   const spec = me.specReady > w.tick ? (me.specReady - w.tick) / cls.specCd : 0;
   const dodge = me.dodgeReady > w.tick ? (me.dodgeReady - w.tick) / 14 : 0;
   const loot = lootValue(me);
+  if (loot !== lastLoot.current) {
+    const d = loot - lastLoot.current;
+    lastLoot.current = loot;
+    if (d > 0) setTimeout(() => setGain({ v: d, id: Date.now() }), 0);
+  }
   const boss = w.bossIdx < w.monsters.length ? w.monsters[w.bossIdx] : null;
   const bossNear = !!boss && boss.kind === MON.KING && boss.hp > 0 && boss.hp < boss.maxHp && me.state === PS.ALIVE && Math.hypot(boss.x - me.x, boss.y - me.y) < 256 * 11;
   const hero = HERO_SPRITES[me.cls][h.me % 2];
@@ -226,7 +233,14 @@ export function Hud({ session }: { session: GameSession }) {
         <div className="hud-br">
           <div className="loot-box">
             UNBANKED LOOT
-            <div className="v">{loot}</div>
+            <div className="v">
+              {gain && (
+                <span key={gain.id} className="gain">
+                  +{gain.v}
+                </span>
+              )}
+              {loot}
+            </div>
             {loot > 0 && !open && <div style={{ color: "#ff8a9a" }}>lost if you die</div>}
           </div>
           <div className="hotbar">

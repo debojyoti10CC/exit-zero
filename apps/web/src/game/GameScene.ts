@@ -141,6 +141,7 @@ export class GameScene extends Phaser.Scene {
   rivalToast: number[] = [0, 0, 0, 0];
   contracts: ContractTracker | null = null;
   lastLoot = 0;
+  lastBeat = 0;
   lastPos = { x: 0, y: 0 };
   endNotified = false;
   endTimer = 0;
@@ -1085,6 +1086,18 @@ export class GameScene extends Phaser.Scene {
     const low = meP.state === PS.ALIVE && meP.hp < meP.maxHp * 0.3 ? (Math.sin(time / 140) * 0.5 + 0.5) * 0.12 : 0;
     this.overlay.setAlpha(corr * 0.07 + pulse + low);
     if (this.vignette) this.vignette.strength = 0.4 + corr * 0.25 + low;
+
+    // Countdown beeps before the portals open and before the collapse.
+    if (w.phase === PHASE.RUNNING && meP.state === PS.ALIVE) {
+      const toPortal = Math.ceil((w.portalTick - w.tick) / TICKS_PER_SEC);
+      const toCollapse = Math.ceil((w.collapseTick - w.tick) / TICKS_PER_SEC);
+      const beat = toPortal > 0 && toPortal <= 5 ? toPortal : toCollapse > 0 && toCollapse <= 10 ? toCollapse : 0;
+      if (beat && beat !== this.lastBeat) {
+        this.lastBeat = beat;
+        sfx.windup();
+        hud.toast({ title: String(beat), sub: toPortal > 0 && toPortal <= 5 ? "portals opening" : "the crypt collapses", color: toPortal > 0 && toPortal <= 5 ? "#b98bff" : "#e8364f", big: true }, 800);
+      }
+    }
 
     // Portal hum by distance
     if (portalsOpen(w) && this.pred) {
