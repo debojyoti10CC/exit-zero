@@ -1,0 +1,1735 @@
+{
+  "address": "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi",
+  "metadata": {
+    "name": "exit_zero",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "EXIT//ZERO: multiplayer extraction dungeon running on MagicBlock Ephemeral Rollups"
+  },
+  "instructions": [
+    {
+      "name": "begin",
+      "docs": [
+        "Generates the dungeon deterministically from the verified seed and opens it."
+      ],
+      "discriminator": [
+        35,
+        150,
+        31,
+        42,
+        98,
+        141,
+        116,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "Session key authorised in `join`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "chest_callback",
+      "docs": [
+        "VRF callback: rolls the chest's loot from verified randomness."
+      ],
+      "discriminator": [
+        232,
+        119,
+        12,
+        232,
+        125,
+        202,
+        50,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "chest",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "combat",
+      "docs": [
+        "kind: 0 attack, 1 special, 2 dodge, 3 potion"
+      ],
+      "discriminator": [
+        17,
+        180,
+        178,
+        56,
+        203,
+        82,
+        45,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "Session key authorised in `join`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "aim",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "commit_room",
+      "docs": [
+        "Commits the room to Solana mid-run (snapshots for verification) or",
+        "commits and undelegates it (admin maintenance)."
+      ],
+      "discriminator": [
+        138,
+        145,
+        121,
+        138,
+        83,
+        230,
+        52,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "undelegate",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "create_hall",
+      "discriminator": [
+        238,
+        134,
+        103,
+        129,
+        84,
+        142,
+        22,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  97,
+                  108,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_room",
+      "discriminator": [
+        130,
+        166,
+        32,
+        2,
+        247,
+        120,
+        178,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "create_vault",
+      "discriminator": [
+        29,
+        237,
+        247,
+        208,
+        193,
+        82,
+        54,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "page",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "delegate_hall",
+      "discriminator": [
+        162,
+        218,
+        61,
+        184,
+        101,
+        78,
+        171,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hall"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                39,
+                206,
+                34,
+                30,
+                34,
+                185,
+                225,
+                70,
+                43,
+                135,
+                118,
+                187,
+                241,
+                214,
+                90,
+                238,
+                9,
+                184,
+                213,
+                138,
+                166,
+                137,
+                36,
+                34,
+                91,
+                198,
+                250,
+                245,
+                132,
+                221,
+                201,
+                209
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hall"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hall"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  97,
+                  108,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_program",
+          "address": "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "delegate_room",
+      "discriminator": [
+        39,
+        6,
+        122,
+        70,
+        65,
+        76,
+        166,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                39,
+                206,
+                34,
+                30,
+                34,
+                185,
+                225,
+                70,
+                43,
+                135,
+                118,
+                187,
+                241,
+                214,
+                90,
+                238,
+                9,
+                184,
+                213,
+                138,
+                166,
+                137,
+                36,
+                34,
+                91,
+                198,
+                250,
+                245,
+                132,
+                221,
+                201,
+                209
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "room"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "delegate_vault",
+      "discriminator": [
+        166,
+        89,
+        17,
+        247,
+        90,
+        45,
+        115,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                39,
+                206,
+                34,
+                30,
+                34,
+                185,
+                225,
+                70,
+                43,
+                135,
+                118,
+                187,
+                241,
+                214,
+                90,
+                238,
+                9,
+                184,
+                213,
+                138,
+                166,
+                137,
+                36,
+                34,
+                91,
+                198,
+                250,
+                245,
+                132,
+                221,
+                201,
+                209
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "page",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "interact",
+      "docs": [
+        "Opens doors and chests. Opening a chest requests VRF; loot arrives in `chest_callback`."
+      ],
+      "discriminator": [
+        86,
+        195,
+        210,
+        119,
+        90,
+        185,
+        132,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "client_seed",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "join",
+      "docs": [
+        "Wallet joins the room and authorises a session key for gameplay.",
+        "Re-joining with the same wallet during a run rotates the session key (reconnect)."
+      ],
+      "discriminator": [
+        206,
+        55,
+        2,
+        106,
+        113,
+        220,
+        17,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "docs": [
+            "The player's wallet. Signs once per match; pays nothing on the rollup."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "class",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": {
+            "array": [
+              "u8",
+              12
+            ]
+          }
+        },
+        {
+          "name": "session",
+          "type": "pubkey"
+        },
+        {
+          "name": "session_exp",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "leave",
+      "discriminator": [
+        59,
+        234,
+        148,
+        108,
+        107,
+        149,
+        173,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "Session key authorised in `join`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "move_to",
+      "discriminator": [
+        203,
+        97,
+        69,
+        158,
+        17,
+        230,
+        3,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "Session key authorised in `join`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "x",
+          "type": "i32"
+        },
+        {
+          "name": "y",
+          "type": "i32"
+        },
+        {
+          "name": "aim",
+          "type": "u8"
+        },
+        {
+          "name": "moving",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "base_account",
+          "writable": true
+        },
+        {
+          "name": "buffer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  110,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  101,
+                  45,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "base_account"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                181,
+                183,
+                0,
+                225,
+                242,
+                87,
+                58,
+                192,
+                204,
+                6,
+                34,
+                1,
+                52,
+                74,
+                207,
+                151,
+                184,
+                53,
+                6,
+                235,
+                140,
+                229,
+                25,
+                152,
+                204,
+                98,
+                126,
+                24,
+                147,
+                128,
+                167,
+                62
+              ]
+            }
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "reset",
+      "docs": [
+        "Re-opens a settled room for the next lobby."
+      ],
+      "discriminator": [
+        23,
+        81,
+        251,
+        84,
+        138,
+        183,
+        240,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "schedule_ticks",
+      "docs": [
+        "Schedules the world tick on the MagicBlock crank so the dungeon runs without a server."
+      ],
+      "discriminator": [
+        243,
+        206,
+        0,
+        155,
+        207,
+        136,
+        85,
+        251
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "magic_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": "i64"
+        },
+        {
+          "name": "interval_ms",
+          "type": "i64"
+        },
+        {
+          "name": "iterations",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "seed_callback",
+      "docs": [
+        "VRF callback: stores the verified dungeon seed."
+      ],
+      "discriminator": [
+        232,
+        222,
+        68,
+        43,
+        128,
+        141,
+        0,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_class",
+      "discriminator": [
+        88,
+        208,
+        86,
+        138,
+        241,
+        160,
+        255,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "Session key authorised in `join`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "class",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "Records results in the Hall and relics in the Vault, then commits all",
+        "three accounts to Solana. Callable by anyone once the run has ended."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "hall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  97,
+                  108,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start",
+      "docs": [
+        "Host locks the lobby and requests the dungeon seed from MagicBlock VRF.",
+        "Can be called again while waiting if the oracle is slow."
+      ],
+      "discriminator": [
+        62,
+        15,
+        117,
+        236,
+        47,
+        1,
+        89,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "client_seed",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "tick",
+      "docs": [
+        "Permissionless world step. At most one step per rollup slot, so the crank",
+        "and fallback client tickers can never speed the game up."
+      ],
+      "discriminator": [
+        92,
+        79,
+        44,
+        8,
+        101,
+        80,
+        63,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_relic",
+      "docs": [
+        "Transfers ownership of a relic recorded in the Vault."
+      ],
+      "discriminator": [
+        120,
+        181,
+        152,
+        119,
+        11,
+        62,
+        241,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u16"
+        },
+        {
+          "name": "to",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GameRoom",
+      "discriminator": [
+        201,
+        210,
+        56,
+        115,
+        19,
+        56,
+        27,
+        69
+      ]
+    },
+    {
+      "name": "Hall",
+      "discriminator": [
+        187,
+        199,
+        90,
+        26,
+        91,
+        128,
+        153,
+        206
+      ]
+    },
+    {
+      "name": "VaultPage",
+      "discriminator": [
+        161,
+        176,
+        122,
+        69,
+        33,
+        231,
+        135,
+        40
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "WrongPhase",
+      "msg": "Action not allowed in the current match phase"
+    },
+    {
+      "code": 6001,
+      "name": "BadSession",
+      "msg": "Session key is not authorised for this room"
+    },
+    {
+      "code": 6002,
+      "name": "SessionExpired",
+      "msg": "Session key has expired; rejoin to renew it"
+    },
+    {
+      "code": 6003,
+      "name": "LobbyFull",
+      "msg": "The room is full"
+    },
+    {
+      "code": 6004,
+      "name": "NotAlive",
+      "msg": "Player is not alive"
+    },
+    {
+      "code": 6005,
+      "name": "NotHost",
+      "msg": "Only the host can do this"
+    },
+    {
+      "code": 6006,
+      "name": "BadAction",
+      "msg": "Invalid action"
+    },
+    {
+      "code": 6007,
+      "name": "BadQueue",
+      "msg": "Oracle queue is not a MagicBlock VRF queue"
+    },
+    {
+      "code": 6008,
+      "name": "Corrupt",
+      "msg": "Room state is corrupt"
+    },
+    {
+      "code": 6009,
+      "name": "AlreadySettled",
+      "msg": "Match already settled"
+    },
+    {
+      "code": 6010,
+      "name": "BadRelic",
+      "msg": "Relic not found"
+    },
+    {
+      "code": 6011,
+      "name": "NotOwner",
+      "msg": "Only the relic owner can transfer it"
+    }
+  ],
+  "types": [
+    {
+      "name": "GameRoom",
+      "docs": [
+        "Match room. The encoded `ez_core::World` (`WORLD_SIZE` bytes) is stored right",
+        "after these fields, at `WORLD_OFFSET`, and is read/written in place so the",
+        "program never holds two copies of the world in its 32KB heap."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room_id",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "wallets",
+            "type": {
+              "array": [
+                "pubkey",
+                4
+              ]
+            }
+          },
+          {
+            "name": "sessions",
+            "type": {
+              "array": [
+                "pubkey",
+                4
+              ]
+            }
+          },
+          {
+            "name": "session_exp",
+            "type": {
+              "array": [
+                "i64",
+                4
+              ]
+            }
+          },
+          {
+            "name": "last_tick_slot",
+            "type": "u64"
+          },
+          {
+            "name": "crank_task",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Hall",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_runs",
+            "type": "u64"
+          },
+          {
+            "name": "total_extracted",
+            "type": "u64"
+          },
+          {
+            "name": "entries",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "HallEntry"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "HallEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                12
+              ]
+            }
+          },
+          {
+            "name": "runs",
+            "type": "u32"
+          },
+          {
+            "name": "extractions",
+            "type": "u32"
+          },
+          {
+            "name": "kills",
+            "type": "u32"
+          },
+          {
+            "name": "pvp_kills",
+            "type": "u32"
+          },
+          {
+            "name": "best_value",
+            "type": "u32"
+          },
+          {
+            "name": "total_value",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Relic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "rarity",
+            "type": "u8"
+          },
+          {
+            "name": "room",
+            "type": "u8"
+          },
+          {
+            "name": "nonce",
+            "type": "u32"
+          },
+          {
+            "name": "tick",
+            "type": "u32"
+          },
+          {
+            "name": "seed8",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "value",
+            "type": "u32"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultPage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "page",
+            "type": "u8"
+          },
+          {
+            "name": "relics",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Relic"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

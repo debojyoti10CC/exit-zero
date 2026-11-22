@@ -1,0 +1,27 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_sim_free: (a: number, b: number) => void;
+export const angle_to: (a: number, b: number, c: number, d: number) => number;
+export const item_value: (a: number, b: number) => number;
+export const sim_act_combat: (a: number, b: number, c: number, d: number) => void;
+export const sim_act_move: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const sim_bytes: (a: number) => [number, number];
+export const sim_interact: (a: number, b: number) => number;
+export const sim_is_bot: (a: number, b: number) => number;
+export const sim_load: (a: number, b: number) => [number, number, number];
+export const sim_phase: (a: number) => number;
+export const sim_practice: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+export const sim_replace: (a: number, b: number, c: number) => number;
+export const sim_resolve_chest: (a: number, b: number, c: number, d: number) => number;
+export const sim_slide: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+export const sim_tick: (a: number) => [number, number];
+export const sim_tick_count: (a: number) => number;
+export const sim_tick_only: (a: number) => void;
+export const sim_world_size: () => number;
+export const __wbindgen_export_0: WebAssembly.Table;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_start: () => void;

@@ -1,0 +1,20 @@
+[toolchain]
+anchor_version = "1.0.2"
+solana_version = "3.1.9"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+exit_zero = "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi"
+
+[programs.localnet]
+exit_zero = "3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "echo 'see crates/ez-core tests and scripts/'"

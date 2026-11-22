@@ -1,0 +1,15 @@
+[package]
+name = "ez-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Browser bindings for the EXIT//ZERO game core"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ez-core = { path = "../ez-core" }
+wasm-bindgen = "=0.2.100"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

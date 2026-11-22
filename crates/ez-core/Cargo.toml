@@ -1,0 +1,13 @@
+[package]
+name = "ez-core"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic EXIT//ZERO game simulation shared by the Solana program and the browser (WASM)."
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

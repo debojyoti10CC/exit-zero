@@ -1,0 +1,11 @@
+target/
+node_modules/
+apps/web/dist/
+.anchor/
+*.keypair.json
+*-keypair.json
+id.json
+.env
+.env.local
+.DS_Store
+.claude/settings.local.json
