@@ -79,9 +79,9 @@ export type TitlePick = "online" | "practice" | "hero" | "hall" | "vault" | "how
 
 export function Title({ name, cls, onPick }: { name: string; cls: number; onPick: (p: TitlePick) => void }) {
   const items: { label: string; hint?: string; id: TitlePick }[] = [
-    { label: "Enter the Crypt", hint: "online · 4 players", id: "online" },
-    { label: "Practice", hint: "vs rival bots", id: "practice" },
-    { label: "Adventurer", hint: CLASSES[cls].name, id: "hero" },
+    { label: "Enter the Hollow", hint: "online · 4 reapers", id: "online" },
+    { label: "Training", hint: "vs rival reapers", id: "practice" },
+    { label: "Choose Reaper", hint: CLASSES[cls].name, id: "hero" },
     { label: "Hall of Fame", id: "hall" },
     { label: "Relic Vault", id: "vault" },
     { label: "How to Play", id: "howto" },
@@ -90,7 +90,7 @@ export function Title({ name, cls, onPick }: { name: string; cls: number; onPick
     <div className="title-wrap">
       <div>
         <Logo />
-        <div className="subtitle">Loot · Betray · Escape — before the crypt collapses</div>
+        <div className="subtitle">✦ Cut down Hollows · Claim their souls · Cross over before the gates seal ✦</div>
       </div>
       <div />
       <div className="title-bottom">
@@ -105,7 +105,7 @@ export function Title({ name, cls, onPick }: { name: string; cls: number; onPick
         </div>
         <div className="panel hero-card" onClick={() => onPick("hero")} style={{ cursor: "pointer" }}>
           <div className="px-title" style={{ fontSize: 8 }}>
-            Your adventurer
+            Your reaper
           </div>
           <div className="who">
             <div className="pedestal" style={{ height: 80, width: 64 }}>
@@ -358,9 +358,9 @@ export function ResultsScroll({
       <div className={`panel results ${extracted ? "gold" : "blood"}`}>
         <div className="result-banner">
           <h1 className="result-title" style={{ color: extracted ? "var(--gold)" : "var(--red)" }}>
-            {extracted ? "EXTRACTED" : "ELIMINATED"}
+            {extracted ? "CROSSED OVER" : "SOUL LOST"}
           </h1>
-          <div className="result-sub">{extracted ? "You escaped the Forgotten Crypt with your haul." : "Your pack spilled on the crypt floor. Someone else may carry it out."}</div>
+          <div className="result-sub">{extracted ? "You crossed the spirit gate with every soul you carried." : "Your soul faded. Your haul waits on the floor for another reaper."}</div>
           {!extracted && death && death.lost > 0 && (
             <div className="recap">
               {death.portalsOpen
@@ -387,13 +387,13 @@ export function ResultsScroll({
               )}
             </div>
             <div className="gold-count">{shown}</div>
-            <div className="gold-label">GOLD SECURED</div>
+            <div className="gold-label">SOULS SECURED</div>
           </div>
 
           <div>
             <div className="ledger">
               <div>
-                <span>Monsters slain</span>
+                <span>Hollows purified</span>
                 <b>{p.kills}</b>
               </div>
               <div>

@@ -3,23 +3,24 @@
 // 16px tileset (no gradients, blurs or rounded corners anywhere).
 
 export const PAL = {
-  ink: "#0b0710",
-  void: "#140c1c",
-  deep: "#1c1526",
-  stone0: "#2a2036",
-  stone1: "#3b2d4a",
-  stone2: "#5b4a70",
-  stone3: "#8a7a9e",
-  gold0: "#7a4a12",
-  gold1: "#c9963a",
-  gold2: "#f4c95d",
-  gold3: "#fff2b0",
-  blood0: "#4a0a14",
-  blood1: "#a01830",
-  blood2: "#e8364f",
-  arcane1: "#6b3fd6",
-  arcane2: "#b98bff",
-  bone: "#ece4d6",
+  // Spirit-reaper theme: ink-black robes, cold stone, ice-blue spirit energy, crimson.
+  ink: "#050508",
+  void: "#0b0c12",
+  deep: "#10121a",
+  stone0: "#1b1e2a",
+  stone1: "#2a2f40",
+  stone2: "#4a5470",
+  stone3: "#8a95b0",
+  gold0: "#1d4a78",
+  gold1: "#4aa8e8",
+  gold2: "#9fe0ff",
+  gold3: "#ffffff",
+  blood0: "#4a0610",
+  blood1: "#a0142a",
+  blood2: "#e0283c",
+  arcane1: "#3a6ab0",
+  arcane2: "#cfe8ff",
+  bone: "#f2f4f8",
 };
 
 type Painter = (px: (x: number, y: number, c: string) => void, s: number) => void;

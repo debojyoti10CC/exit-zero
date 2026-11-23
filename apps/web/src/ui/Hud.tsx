@@ -189,7 +189,7 @@ export function Hud({ session }: { session: GameSession }) {
 
       {me.state === PS.ALIVE && h.extractPct > 0 && (
         <div className="extract">
-          ESCAPING… HOLD POSITION
+          CROSSING OVER… HOLD STILL
           <div className="bar">
             <div className="fill" style={{ width: `${h.extractPct * 100}%` }} />
           </div>
@@ -232,7 +232,7 @@ export function Hud({ session }: { session: GameSession }) {
       {me.state === PS.ALIVE && (
         <div className="hud-br">
           <div className="loot-box">
-            UNBANKED LOOT
+            UNBANKED SOULS
             <div className="v">
               {gain && (
                 <span key={gain.id} className="gain">

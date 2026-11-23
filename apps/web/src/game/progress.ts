@@ -20,16 +20,16 @@ export interface Progress {
 }
 
 export const TITLES = [
-  "Grave Robber",
-  "Tomb Scavenger",
-  "Crypt Runner",
-  "Relic Hunter",
-  "Bone Breaker",
-  "Vault Breaker",
-  "Hollow Stalker",
+  "Initiate Reaper",
+  "Soul Bearer",
+  "Hollow Hunter",
+  "Moon Blade",
+  "Mask Breaker",
+  "Gate Warden",
+  "Spirit Captain",
   "King's Bane",
-  "Corruption Walker",
-  "Lord of the Hollow",
+  "Black Moon",
+  "Lord of Reapers",
 ];
 
 const KEY = "exitzero.progress.v1";
@@ -97,15 +97,15 @@ export function awardRun(w: World, me: number, contracts: ContractResult[]): Run
   const pl = w.players[me];
   const extracted = pl.state === PS.EXTRACTED;
   const lines: XpLine[] = [];
-  if (pl.kills) lines.push({ label: `${pl.kills} monsters slain`, xp: pl.kills * 6 });
+  if (pl.kills) lines.push({ label: `${pl.kills} Hollows purified`, xp: pl.kills * 6 });
   if (extracted) {
-    lines.push({ label: "Escaped alive", xp: 80 });
-    if (pl.banked) lines.push({ label: `${pl.banked} gold banked`, xp: Math.round(pl.banked / 8) });
+    lines.push({ label: "Crossed over", xp: 80 });
+    if (pl.banked) lines.push({ label: `${pl.banked} souls banked`, xp: Math.round(pl.banked / 8) });
   } else {
-    lines.push({ label: "Fell in the crypt", xp: 10 });
+    lines.push({ label: "Soul faded", xp: 10 });
   }
   if (pl.pvpKills) lines.push({ label: `${pl.pvpKills} betrayal${pl.pvpKills > 1 ? "s" : ""}`, xp: pl.pvpKills * 35 });
-  if (w.bossDmg[me] > 0 && w.monsters[w.bossIdx]?.hp === 0) lines.push({ label: "Fought the Hollow King", xp: 120 });
+  if (w.bossDmg[me] > 0 && w.monsters[w.bossIdx]?.hp === 0) lines.push({ label: "Purified the Hollow King", xp: 120 });
   for (const c of contracts) if (c.done) lines.push({ label: `Contract: ${c.title}`, xp: c.xp });
 
   // Daily streak: first run each day adds a bonus that grows with the streak.

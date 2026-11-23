@@ -5,19 +5,19 @@
    - hard offset shadows only; no gradients, blur, glow or rounded corners */
 
 :root {
-  --ink: #0b0710;
-  --void: #140c1c;
-  --deep: #1c1526;
-  --stone0: #2a2036;
-  --stone1: #3b2d4a;
-  --stone2: #5b4a70;
-  --stone3: #8a7a9e;
-  --text: #ece4d6;
-  --muted: #9a8cab;
-  --gold: #f4c95d;
-  --gold1: #c9963a;
-  --violet: #b98bff;
-  --red: #e8364f;
+  --ink: #050508;
+  --void: #0b0c12;
+  --deep: #10121a;
+  --stone0: #1b1e2a;
+  --stone1: #2a2f40;
+  --stone2: #4a5470;
+  --stone3: #8a95b0;
+  --text: #eef2f8;
+  --muted: #8a95b0;
+  --gold: #9fe0ff;
+  --gold1: #4aa8e8;
+  --violet: #cfe8ff;
+  --red: #e0283c;
   --green: #5fd16b;
   --blue: #4aa8ff;
   --font: "Pixelify Sans", ui-sans-serif, system-ui, sans-serif;
@@ -159,7 +159,7 @@ canvas,
 .btn.primary {
   border-image-source: var(--px-btn-gold);
   color: var(--ink);
-  text-shadow: 1px 1px 0 #fff2b0;
+  text-shadow: 1px 1px 0 #ffffff;
 }
 .btn.primary:hover:not(:disabled) {
   border-image-source: var(--px-btn-gold-hover);
@@ -399,7 +399,7 @@ canvas,
     -4px 0 0 var(--ink),
     0 4px 0 var(--ink),
     0 -4px 0 var(--ink),
-    8px 8px 0 #2a1440;
+    8px 8px 0 #0d1c33;
   letter-spacing: 2px;
   user-select: none;
   text-align: center;
@@ -801,8 +801,8 @@ table.t tr.me td {
 }
 .corrupt > div:first-child {
   height: 100%;
-  background: var(--arcane1, #6b3fd6);
-  box-shadow: inset 0 -2px 0 #3a1c8a;
+  background: var(--blood2, #e0283c);
+  box-shadow: inset 0 -2px 0 #1d4a78;
 }
 .corrupt .marks span {
   position: absolute;
@@ -1466,4 +1466,15 @@ table.t tr.me td {
     transform: translateY(-20px);
     opacity: 0;
   }
+}
+
+/* Spirit-reaper theme: heroes wear ink-black robes everywhere in the UI. */
+.sprite {
+  filter: saturate(0.25) brightness(0.68) contrast(1.3) drop-shadow(0 0 0 transparent);
+}
+.logo .zero {
+  color: #9fe0ff;
+}
+.logo .slash {
+  color: #e0283c;
 }

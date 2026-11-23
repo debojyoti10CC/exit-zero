@@ -129,6 +129,32 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
       const f4r = Math.floor(t * 10) % 4;
       const f3 = Math.floor(t * 6) % 3;
       ctx.drawImage(stat, 0, 0);
+      // Night sky above the wall: stars and a huge pale moon.
+      for (let k = 0; k < 40; k++) {
+        const sx2 = Math.floor(hash(k, 77) * W);
+        const sy2 = Math.floor(hash(77, k) * (WALL_Y - 4));
+        if ((Math.floor(t * 2 + k) % 7) === 0) continue;
+        ctx.fillStyle = k % 5 === 0 ? "#cfe8ff" : "#4a5470";
+        ctx.fillRect(sx2, sy2, 1, 1);
+      }
+      {
+        const mx = 336, my = 28, mr = 22;
+        ctx.fillStyle = "rgba(159,224,255,0.06)";
+        ctx.beginPath();
+        ctx.arc(mx, my, mr + 10, 0, Math.PI * 2);
+        ctx.fill();
+        for (let yy = -mr; yy <= mr; yy++) {
+          const half = Math.floor(Math.sqrt(mr * mr - yy * yy));
+          for (let xx = -half; xx <= half; xx++) {
+            // Crescent: cut away a second, offset disc.
+            const cx2 = xx + 9, cy2 = yy - 5;
+            if (cx2 * cx2 + cy2 * cy2 < (mr - 2) * (mr - 2)) continue;
+            const edge = xx * xx + yy * yy > (mr - 2) * (mr - 2);
+            ctx.fillStyle = edge ? "#cfe8ff" : (xx + yy) % 7 === 0 ? "#dfeefc" : "#f2f6ff";
+            ctx.fillRect(mx + xx, my + yy, 1, 1);
+          }
+        }
+      }
 
       // animated fountains
       draw(ctx, `wall_fountain_mid_red_anim_f${f3}`, 160, WALL_Y + 32);
@@ -141,10 +167,12 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
       draw(ctx, "column", W - 24, FLOOR_Y + 24);
 
       // skeleton guards lurking by the gate
+      ctx.filter = "grayscale(1) brightness(1.35)";
       draw(ctx, `skelet_idle_anim_f${f4}`, 188, FLOOR_Y + 10);
       draw(ctx, `skelet_idle_anim_f${(f4 + 2) % 4}`, 278, FLOOR_Y + 10, true);
       draw(ctx, `necromancer_anim_f${f4}`, 360, FLOOR_Y + 30, true);
       draw(ctx, `big_zombie_idle_anim_f${f4}`, 40, FLOOR_Y + 40);
+      ctx.filter = "none";
 
       const { focus: fo, heroes: showHeroes, dim: dm } = props.current;
       if (showHeroes) {
@@ -163,14 +191,16 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(x + 2, y - 2, 12, 2);
           ctx.fillRect(x + 4, y - 1, 8, 2);
+          ctx.filter = "saturate(0.25) brightness(0.62) contrast(1.3)";
           draw(ctx, `${h.base}_${run ? "run" : "idle"}_anim_f${run ? f4r : f4}`, x, y - fr[3], h.flip);
+          ctx.filter = "none";
         });
       }
 
       // Darkness with banded (posterised) light pools.
       dx.globalCompositeOperation = "source-over";
       dx.clearRect(0, 0, W, H);
-      dx.fillStyle = `rgba(6,3,12,${0.82 + dm * 0.12})`;
+      dx.fillStyle = `rgba(3,5,14,${0.8 + dm * 0.12})`;
       dx.fillRect(0, 0, W, H);
       dx.globalCompositeOperation = "destination-out";
       const pool = (x: number, y: number, r: number, a: number) => {
@@ -194,6 +224,7 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
       }
       pool(240, 214, 82 + Math.sin(t * 2) * 2, 1); // the party's own light
       pool(240, WALL_Y + 40, 40, 0.6);
+      pool(336, 28, 54, 1); // moonlight
       ctx.drawImage(dark, 0, 0);
 
       // torch flames + warm glow (drawn after darkness, additive feel)
@@ -205,16 +236,16 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
           [30, 0.035],
           [18, 0.05],
         ] as const) {
-          ctx.fillStyle = `rgba(255,110,30,${a})`;
+          ctx.fillStyle = `rgba(90,170,255,${a})`;
           ctx.beginPath();
           ctx.arc(tch.x, tch.y + 10, r + fl, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = "rgba(255,120,30,0.10)";
+        ctx.fillStyle = "rgba(90,170,255,0.10)";
         ctx.beginPath();
         ctx.arc(tch.x, tch.y + 2, 14 + fl, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "rgba(255,170,60,0.12)";
+        ctx.fillStyle = "rgba(200,235,255,0.12)";
         ctx.beginPath();
         ctx.arc(tch.x, tch.y + 2, 7, 0, Math.PI * 2);
         ctx.fill();
@@ -224,9 +255,9 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
         const fl = Math.floor(t * 12 + tch.x) % 3;
         ctx.fillStyle = "#2b1d12";
         ctx.fillRect(tch.x - 2, tch.y + 3, 4, 3);
-        ctx.fillStyle = "#ff6a1a";
+        ctx.fillStyle = "#3a9cff";
         ctx.fillRect(tch.x - 1, tch.y - 1 - fl, 3, 4 + fl);
-        ctx.fillStyle = "#ffd25a";
+        ctx.fillStyle = "#e8f6ff";
         ctx.fillRect(tch.x, tch.y, 1, 2 + (fl % 2));
       }
       // embers
@@ -238,7 +269,7 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
           e.x = Math.random() * W;
         }
         const a = 0.35 + 0.35 * Math.sin(t * 3 + e.ph);
-        ctx.fillStyle = e.ph > 4.5 ? `rgba(185,139,255,${a})` : `rgba(255,140,50,${a})`;
+        ctx.fillStyle = e.ph > 4.5 ? `rgba(224,40,60,${a})` : `rgba(159,224,255,${a})`;
         ctx.fillRect(Math.floor(e.x), Math.floor(e.y), 1, 1);
       }
       // Stepped vignette.

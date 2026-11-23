@@ -29,19 +29,19 @@ export const CLASS_ARCANIST = 1;
 export const CLASS_ROGUE = 2;
 
 export const CLASSES = [
-  { name: "Vanguard", hp: 150, speed: 128, atkCd: 6, specCd: 110, role: "Melee / Tank", special: "Shield Bash", desc: "Wide cleaving sword. Shield Bash blocks 75% damage, stuns and knocks back." },
-  { name: "Arcanist", hp: 90, speed: 120, atkCd: 5, specCd: 60, role: "Magic / Ranged", special: "Fireball", desc: "Fires arcane bolts. Fireball explodes in an area — and burns anyone caught in it." },
-  { name: "Rogue", hp: 110, speed: 150, atkCd: 3, specCd: 45, role: "Speed / Stealth", special: "Shadow Step", desc: "Fastest feet and quick stabs. Shadow Step blinks forward, grants a moment of immunity and a double-damage crit." },
+  { name: "Reaper", hp: 150, speed: 128, atkCd: 6, specCd: 110, role: "Spirit Blade / Guard", special: "Spirit Guard", desc: "A great spirit blade that cleaves wide. Spirit Guard blocks 75% damage, stuns and hurls Hollows back." },
+  { name: "Spellbinder", hp: 90, speed: 120, atkCd: 5, specCd: 60, role: "Spirit Arts / Ranged", special: "Blue Flame", desc: "Casts bolts of spirit energy. Blue Flame bursts in an area — and burns anyone caught in it." },
+  { name: "Shade", hp: 110, speed: 150, atkCd: 3, specCd: 45, role: "Speed / Assassin", special: "Blink Step", desc: "The fastest blade alive. Blink Step vanishes forward, grants a moment of immunity and a double-damage crit." },
 ];
 
 export const MON = { NONE: 0, SKELETON: 1, NECRO: 2, BRUTE: 3, KING: 4, IMP: 5 } as const;
-export const MON_NAMES = ["", "Skeleton", "Bone Caller", "Crypt Brute", "The Hollow King", "Corruption Imp"];
+export const MON_NAMES = ["", "Lesser Hollow", "Howling Hollow", "Great Hollow", "The Hollow King", "Lost Soul"];
 export const MON_RANGE = [0, 300, 256 * 6, 380, 460, 260];
 
 export const PROJ = { NONE: 0, BOLT: 1, FIREBALL: 2, BONE: 3, ORB: 4 } as const;
 
 export const ITEM = { NONE: 0, COINS: 1, GEM: 2, CHALICE: 3, IDOL: 4, CROWN: 5, BLADE: 6, AEGIS: 7, POTION: 8, KEY: 9, HEART: 10 } as const;
-export const ITEM_NAMES = ["", "Grave Coins", "Soul Gem", "Chalice", "Hollow Idol", "Crown", "Relic Blade", "Aegis", "Potion", "Vault Key", "Heart of the Hollow"];
+export const ITEM_NAMES = ["", "Soul Fragments", "Soul Gem", "Spirit Chalice", "Hollow Mask", "Moon Crown", "Spirit Blade", "Spirit Ward", "Spirit Draught", "Gate Seal", "Heart of the Hollow"];
 export const ITEM_BASE = [0, 20, 45, 60, 90, 140, 70, 70, 0, 0, 160];
 export const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
 export const RARITY_MULT10 = [10, 15, 30, 60, 120];

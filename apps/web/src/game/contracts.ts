@@ -35,18 +35,18 @@ export interface ContractResult {
 }
 
 const POOL: ContractDef[] = [
-  { id: "bank500", title: "Extract with 500+ gold", xp: 90, target: 500, needsExtract: true, progress: (w, me) => (w.players[me].state === PS.EXTRACTED ? w.players[me].banked : lootValue(w, me)) },
-  { id: "bank1200", title: "Extract with 1200+ gold", xp: 180, target: 1200, needsExtract: true, progress: (w, me) => (w.players[me].state === PS.EXTRACTED ? w.players[me].banked : lootValue(w, me)) },
-  { id: "kills8", title: "Slay 8 monsters", xp: 60, target: 8, progress: (w, me) => w.players[me].kills },
-  { id: "kills15", title: "Slay 15 monsters", xp: 110, target: 15, progress: (w, me) => w.players[me].kills },
+  { id: "bank500", title: "Cross over with 500+ souls", xp: 90, target: 500, needsExtract: true, progress: (w, me) => (w.players[me].state === PS.EXTRACTED ? w.players[me].banked : lootValue(w, me)) },
+  { id: "bank1200", title: "Cross over with 1200+ souls", xp: 180, target: 1200, needsExtract: true, progress: (w, me) => (w.players[me].state === PS.EXTRACTED ? w.players[me].banked : lootValue(w, me)) },
+  { id: "kills8", title: "Purify 8 Hollows", xp: 60, target: 8, progress: (w, me) => w.players[me].kills },
+  { id: "kills15", title: "Purify 15 Hollows", xp: 110, target: 15, progress: (w, me) => w.players[me].kills },
   { id: "chests4", title: "Open 4 chests", xp: 70, target: 4, progress: (_w, _me, c) => c.chests },
   { id: "epic", title: "Find an Epic or better", xp: 100, target: 1, progress: (_w, _me, c) => c.epics },
-  { id: "vault", title: "Unlock the Vault", xp: 120, target: 1, progress: (_w, _me, c) => c.door },
+  { id: "vault", title: "Break the gate seal", xp: 120, target: 1, progress: (_w, _me, c) => c.door },
   { id: "king", title: "Wound the Hollow King", xp: 90, target: 1, progress: (w, me) => (w.bossDmg[me] > 0 ? 1 : 0) },
   { id: "betray", title: "Betray a rival", xp: 110, target: 1, progress: (w, me) => w.players[me].pvpKills },
   { id: "streak3", title: "Kill 3 in a streak", xp: 70, target: 3, progress: (_w, _me, c) => c.bestStreak },
-  { id: "early", title: "Escape within 60s of the portals", xp: 80, target: 1, needsExtract: true, progress: () => 0 },
-  { id: "dry", title: "Extract without drinking a potion", xp: 90, target: 1, needsExtract: true, progress: (w, me, c) => (w.players[me].state === PS.EXTRACTED && c.potions === 0 ? 1 : 0) },
+  { id: "early", title: "Cross within 60s of the gates", xp: 80, target: 1, needsExtract: true, progress: () => 0 },
+  { id: "dry", title: "Cross over without a draught", xp: 90, target: 1, needsExtract: true, progress: (w, me, c) => (w.players[me].state === PS.EXTRACTED && c.potions === 0 ? 1 : 0) },
 ];
 
 function lootValue(w: World, me: number) {

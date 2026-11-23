@@ -23,7 +23,11 @@ const HERO = [
   ["wizzard_m", "wizzard_f"],
   ["elf_m", "elf_f"],
 ];
-const WEAPON = ["weapon_knight_sword", "weapon_red_magic_staff", "weapon_knife"];
+const WEAPON = ["weapon_katana", "weapon_green_magic_staff", "weapon_katana"];
+/** Black robes: heroes are drawn darkened, like ink silhouettes with bright blades. */
+const ROBE_TINT = 0x6c7088;
+/** Hollows: bone-white masks; the King keeps a faint crimson. Lost Souls are shadows. */
+const HOLLOW_TINT = [0xffffff, 0xf2f4ff, 0xe6ecff, 0xeaeef8, 0xffe4e4, 0x4a4e66];
 
 function px(u: number) {
   return u * U2PX;
@@ -377,6 +381,7 @@ export class GameScene extends Phaser.Scene {
       const col = r.kind === ROOM.BOSS ? 0x5a0010 : r.kind === ROOM.VAULT ? 0x4a3500 : r.kind === ROOM.ENTRANCE ? 0x0a1f3a : -1;
       if (col >= 0) g.fillStyle(col, 0.22).fillRect(r.x * PX, r.y * PX, r.w * PX, r.h * PX);
     }
+    g.fillStyle(0x0b1a33, 0.22).fillRect(0, 0, MAP_PX_W, MAP_PX_H);
     rt.draw(g);
     tmp.destroy();
     g.destroy();
@@ -491,7 +496,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   addTorch(x: number, y: number, seed: number) {
-    const glow = this.w(this.add.image(x, y, "glow").setTint(0xff8a2a).setBlendMode(Phaser.BlendModes.ADD).setDepth(9100).setScale(0.55).setAlpha(0.5));
+    const glow = this.w(this.add.image(x, y, "glow").setTint(0x5ab8ff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9100).setScale(0.55).setAlpha(0.5));
     this.w(
       this.add
         .particles(x, y, "px", {
@@ -499,7 +504,7 @@ export class GameScene extends Phaser.Scene {
           speedY: { min: -18, max: -8 },
           speedX: { min: -3, max: 3 },
           scale: { start: 1, end: 0 },
-          tint: [0xfff1a0, 0xffb040, 0xff6020],
+          tint: [0xffffff, 0x9fe0ff, 0x3a8ae0],
           alpha: { start: 1, end: 0 },
           frequency: 70,
           blendMode: "ADD",
@@ -518,16 +523,16 @@ export class GameScene extends Phaser.Scene {
       if (!p.tx && !p.ty) continue;
       const x = p.tx * PX + 8;
       const y = p.ty * PX + 8;
-      const base = this.w(this.add.image(x, y, "ring").setScale(0.75, 0.42).setTint(0x6a4a8a).setAlpha(0.6).setDepth(1));
-      const swirl = this.w(this.add.image(x, y - 6, "swirl").setScale(0.5, 0.75).setTint(0xb07aff).setAlpha(0.15).setBlendMode(Phaser.BlendModes.ADD).setDepth(y + 2));
+      const base = this.w(this.add.image(x, y, "ring").setScale(0.75, 0.42).setTint(0x4a5470).setAlpha(0.6).setDepth(1));
+      const swirl = this.w(this.add.image(x, y - 6, "swirl").setScale(0.5, 0.75).setTint(0xbfe6ff).setAlpha(0.15).setBlendMode(Phaser.BlendModes.ADD).setDepth(y + 2));
       const swirl2 = this.w(this.add.image(x, y - 6, "swirl").setScale(0.35, 0.55).setTint(0xffffff).setAlpha(0.0).setBlendMode(Phaser.BlendModes.ADD).setDepth(y + 3));
-      const glow = this.w(this.add.image(x, y - 4, "glow").setTint(0x9b5cff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9102).setAlpha(0.15));
+      const glow = this.w(this.add.image(x, y - 4, "glow").setTint(0x7ad0ff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9102).setAlpha(0.15));
       // Rune stones around the pad
       const g = this.w(this.add.graphics().setDepth(1));
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2;
-        g.fillStyle(0x3a2d4a, 1).fillRect(x + Math.cos(a) * 20 - 1.5, y + Math.sin(a) * 12 - 1.5, 3, 3);
-        g.fillStyle(0x8f6bff, 0.8).fillRect(x + Math.cos(a) * 20 - 0.5, y + Math.sin(a) * 12 - 0.5, 1, 1);
+        g.fillStyle(0x2a2f40, 1).fillRect(x + Math.cos(a) * 20 - 1.5, y + Math.sin(a) * 12 - 1.5, 3, 3);
+        g.fillStyle(0x9fe0ff, 0.8).fillRect(x + Math.cos(a) * 20 - 0.5, y + Math.sin(a) * 12 - 0.5, 1, 1);
       }
       this.portalViews.push({ base, swirl, swirl2, glow, x, y });
     }
@@ -649,22 +654,22 @@ export class GameScene extends Phaser.Scene {
       case EV.MON_DIE: {
         const kind = e.c;
         sfx.monsterDie(pan);
-        this.burst(X, Y - 6, kind === MON.IMP ? 0x9a3aff : 0xe8e0cc, kind === MON.KING ? 60 : 16, kind === MON.KING ? 70 : 40);
+        this.purify(X, Y - 6, kind === MON.KING ? 70 : kind === MON.BRUTE ? 34 : 18);
         if (kind === MON.KING) {
           sfx.gong();
           this.cameras.main.shake(700, 0.012);
           this.cameras.main.flash(300, 255, 80, 80);
-          hud.toast({ title: "THE HOLLOW KING FALLS", sub: "Every contributor receives a reward", color: "#ff6070", big: true }, 4000);
+          hud.toast({ title: "THE HOLLOW KING IS PURIFIED", sub: "Every blade that struck him is rewarded", color: "#ff6070", big: true }, 4000);
           hud.feed(`${e.b < 4 ? this.pname(e.b, w) : "Someone"} landed the killing blow on <b style="color:#ff6070">The Hollow King</b>`);
         } else if (kind === MON.BRUTE && e.b < 4) {
-          hud.feed(`${this.pname(e.b, w)} slew a <b>Crypt Brute</b>`);
+          hud.feed(`${this.pname(e.b, w)} purified a <b>Great Hollow</b>`);
         }
         break;
       }
       case EV.PLAYER_DIE: {
         const victim = this.pname(e.a, w);
-        const by = e.b < 4 ? this.pname(e.b, w) : e.b === SRC_WORLD ? "the collapse" : "the crypt";
-        hud.feed(`${victim} was slain by ${by}`);
+        const by = e.b < 4 ? this.pname(e.b, w) : e.b === SRC_WORLD ? "the sealing gates" : "a Hollow";
+        hud.feed(`${victim} was devoured by ${by}`);
         this.burst(X, Y - 8, 0xb01020, 30, 50);
         if (e.a === me) {
           let best = 1e9;
@@ -672,7 +677,7 @@ export class GameScene extends Phaser.Scene {
           hud.set({ death: { lost: this.lastLoot, portalTiles: Math.round(best / TILE), portalsOpen: portalsOpen(w) } });
           sfx.playerDie();
           this.cameras.main.shake(400, 0.01);
-          hud.toast({ title: "YOU DIED", sub: "Your unbanked loot lies on the floor", color: "#ff3046", big: true }, 3500);
+          hud.toast({ title: "YOUR SOUL FADES", sub: "Your unbanked haul lies on the floor", color: "#ff3046", big: true }, 3500);
         } else if (audible) sfx.playerDie();
         break;
       }
@@ -711,8 +716,8 @@ export class GameScene extends Phaser.Scene {
         sfx.extract();
         this.extractBeam(X, Y);
         const p = w.players[e.a];
-        hud.feed(`${this.pname(e.a, w)} <b style="color:#b98bff">escaped</b> with <b style="color:#ffcf5a">${p.banked}</b>`);
-        if (e.a === me) hud.toast({ title: "EXTRACTED", sub: `${p.banked} gold banked`, color: "#c9a2ff", big: true }, 3500);
+        hud.feed(`${this.pname(e.a, w)} <b style="color:#9fe0ff">crossed over</b> with <b style="color:#ffcf5a">${p.banked}</b>`);
+        if (e.a === me) hud.toast({ title: "CROSSED OVER", sub: `${p.banked} soul value banked`, color: "#c9a2ff", big: true }, 3500);
         break;
       }
       case EV.DOOR:
@@ -722,12 +727,12 @@ export class GameScene extends Phaser.Scene {
         break;
       case EV.ELITES:
         sfx.alarm();
-        hud.toast({ title: "ELITES AWAKEN", sub: "Stronger foes stir in the dark", color: "#ff9a3a", big: true }, 3000);
+        hud.toast({ title: "GREAT HOLLOWS RISE", sub: "Their spiritual pressure fills the halls", color: "#ff9a3a", big: true }, 3000);
         break;
       case EV.PORTALS:
         sfx.gong();
         this.cameras.main.flash(400, 150, 90, 255);
-        hud.toast({ title: "THE PORTALS OPEN", sub: "Reach a portal and hold to escape", color: "#b98bff", big: true }, 3500);
+        hud.toast({ title: "THE SPIRIT GATES OPEN", sub: "Reach a gate and hold to cross over", color: "#b98bff", big: true }, 3500);
         break;
       case EV.WAVE:
         hud.feed(`<b style="color:#c06bff">Corruption wave ${e.a}</b> — imps spill from the walls`);
@@ -735,7 +740,7 @@ export class GameScene extends Phaser.Scene {
       case EV.COLLAPSE:
         sfx.boom();
         this.cameras.main.shake(1200, 0.02);
-        hud.toast({ title: "THE CRYPT COLLAPSES", color: "#ff3046", big: true }, 4000);
+        hud.toast({ title: "THE GATES SEAL FOREVER", color: "#ff3046", big: true }, 4000);
         break;
       case EV.BLINK: {
         const p = w.players[e.a];
@@ -802,7 +807,7 @@ export class GameScene extends Phaser.Scene {
       }
       case EV.BOSS_RAGE:
         sfx.alarm();
-        hud.toast({ title: "THE KING IS ENRAGED", sub: "His guard rises from the bones", color: "#ff4060", big: true }, 2600);
+        hud.toast({ title: "THE KING UNMASKS", sub: "Lesser Hollows answer his howl", color: "#ff4060", big: true }, 2600);
         break;
     }
   }
@@ -828,6 +833,28 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(800, () => em.destroy());
   }
 
+  /** Spirit particles drifting upward: a Hollow being purified. */
+  purify(x: number, y: number, n: number) {
+    const em = this.w(
+      this.add.particles(x, y, "px", {
+        speedX: { min: -14, max: 14 },
+        speedY: { min: -46, max: -12 },
+        lifespan: { min: 500, max: 1100 },
+        scale: { start: 1.2, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: [0xffffff, 0x9fe0ff, 0x4aa8e8],
+        blendMode: "ADD",
+        emitting: false,
+      }),
+    );
+    em.setDepth(9300);
+    em.explode(n);
+    const ring = this.w(this.add.image(x, y + 4, "ring").setTint(0x9fe0ff).setScale(0.1, 0.06).setBlendMode(Phaser.BlendModes.ADD).setDepth(9300));
+    this.tweens.add({ targets: ring, scaleX: 0.7, scaleY: 0.4, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+    this.dyn.push({ x, y, r: 70, a: 0.9 });
+    this.time.delayedCall(1300, () => em.destroy());
+  }
+
   explosion(x: number, y: number) {
     const em = this.w(
       this.add.particles(x, y, "px", {
@@ -835,23 +862,23 @@ export class GameScene extends Phaser.Scene {
         angle: { min: 0, max: 360 },
         lifespan: { min: 300, max: 700 },
         scale: { start: 2, end: 0 },
-        tint: [0xfff2a0, 0xffa030, 0xff4010, 0x601000],
+        tint: [0xffffff, 0x9fe0ff, 0x3a8ae0, 0x0d2a5a],
         blendMode: "ADD",
         emitting: false,
       }),
     );
     em.setDepth(9300);
     em.explode(60);
-    const glow = this.w(this.add.image(x, y, "glow").setTint(0xff7a20).setBlendMode(Phaser.BlendModes.ADD).setDepth(9301).setScale(0.3));
+    const glow = this.w(this.add.image(x, y, "glow").setTint(0x5ab8ff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9301).setScale(0.3));
     this.tweens.add({ targets: glow, scale: 1.4, alpha: 0, duration: 450, onComplete: () => glow.destroy() });
-    const ring = this.w(this.add.image(x, y, "ring").setTint(0xffa040).setScale(0.1).setBlendMode(Phaser.BlendModes.ADD).setDepth(9301));
+    const ring = this.w(this.add.image(x, y, "ring").setTint(0x9fe0ff).setScale(0.1).setBlendMode(Phaser.BlendModes.ADD).setDepth(9301));
     this.tweens.add({ targets: ring, scale: 0.85, alpha: 0, duration: 350, onComplete: () => ring.destroy() });
     this.dyn.push({ x, y, r: 90, a: 1 });
     this.time.delayedCall(900, () => em.destroy());
   }
 
   extractBeam(x: number, y: number) {
-    const beam = this.w(this.add.image(x, y + 4, "beam").setOrigin(0.5, 1).setTint(0xc9a2ff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9302).setScale(2.5, 0.2));
+    const beam = this.w(this.add.image(x, y + 4, "beam").setOrigin(0.5, 1).setTint(0xcfeeff).setBlendMode(Phaser.BlendModes.ADD).setDepth(9302).setScale(2.5, 0.2));
     this.tweens.add({ targets: beam, scaleY: 4, duration: 260, ease: "Cubic.easeOut" });
     this.tweens.add({ targets: beam, alpha: 0, delay: 500, duration: 700, onComplete: () => beam.destroy() });
     this.burst(x, y - 10, 0xd8b8ff, 40, 60);
@@ -869,7 +896,7 @@ export class GameScene extends Phaser.Scene {
     const a = angleRad(aim);
     const r = cls === CLASS_VANGUARD ? 15 : 10;
     const s = this.w(this.add.image(x + Math.cos(a) * r, y - 8 + Math.sin(a) * r, "slash").setRotation(a).setBlendMode(Phaser.BlendModes.ADD).setDepth(9250));
-    s.setScale(cls === CLASS_VANGUARD ? 1.15 : 0.8).setTint(cls === CLASS_ROGUE ? 0xb7a6ff : 0xfff0d0);
+    s.setScale(cls === CLASS_VANGUARD ? 1.5 : 1.0).setTint(cls === CLASS_ROGUE ? 0xffffff : 0xcfeaff);
     this.tweens.add({ targets: s, alpha: 0, scale: s.scale * 1.25, duration: 160, onComplete: () => s.destroy() });
   }
 
@@ -1186,7 +1213,7 @@ export class GameScene extends Phaser.Scene {
       v.sprite.setAlpha(invuln ? 0.55 : 1);
       if (alive) {
         if (performance.now() < v.flashUntil) v.sprite.setTintFill(0xffffff);
-        else v.sprite.clearTint();
+        else v.sprite.setTint(ROBE_TINT);
       }
       if (v.state !== p.state) {
         v.state = p.state;
@@ -1218,7 +1245,7 @@ export class GameScene extends Phaser.Scene {
     const shadow = this.w(this.add.image(0, 0, "shadow").setDepth(2));
     const ring = this.w(this.add.ellipse(0, 0, 14, 5).setStrokeStyle(1, PLAYER_COLORS[i], 0.9).setDepth(2));
     const sprite = this.w(this.add.sprite(0, 0, "dungeon", `${hero}_idle_anim_f0`).setOrigin(0.5, 1).play(`${hero}_idle`));
-    const weapon = this.w(this.add.image(0, 0, "dungeon", WEAPON[p.cls]).setOrigin(0.5, 0.92).setScale(p.cls === CLASS_ROGUE ? 0.75 : p.cls === CLASS_ARCANIST ? 0.7 : 0.6));
+    const weapon = this.w(this.add.image(0, 0, "dungeon", WEAPON[p.cls]).setOrigin(0.5, 0.92).setScale(p.cls === CLASS_ROGUE ? 0.7 : p.cls === CLASS_ARCANIST ? 0.7 : 0.85).setTint(p.cls === CLASS_ARCANIST ? 0x9fe0ff : 0xffffff));
     const aura = this.w(this.add.image(0, 0, "ring").setTint(0x6ac8ff).setScale(0.38).setBlendMode(Phaser.BlendModes.ADD).setDepth(9200).setVisible(false));
     const label = this.u(
       this.add
@@ -1283,7 +1310,7 @@ export class GameScene extends Phaser.Scene {
       else if (windup) v.sprite.setTint(0xff8080);
       else if (B.tick < m.stunUntil) v.sprite.setTint(0x9ab0ff);
       else if (m.elite) v.sprite.setTint(0xffb0b0);
-      else v.sprite.clearTint();
+      else v.sprite.setTint(HOLLOW_TINT[m.kind] ?? 0xffffff);
       if (!windup && v.bang) {
         v.bang.destroy();
         v.bang = undefined;
@@ -1359,7 +1386,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   makeProj(kind: number): ProjView {
-    const col = kind === PROJ.BOLT ? 0x7ad8ff : kind === PROJ.FIREBALL ? 0xff8a20 : kind === PROJ.ORB ? 0xc050ff : 0xe0d8c0;
+    const col = kind === PROJ.BOLT ? 0xe0f4ff : kind === PROJ.FIREBALL ? 0x4ab0ff : kind === PROJ.ORB ? 0xe0283c : 0xe0d8c0;
     const sprite = this.w(kind === PROJ.BONE ? this.add.image(0, 0, "icon_bone") : this.add.image(0, 0, "orb").setTint(col).setScale(kind === PROJ.FIREBALL ? 0.9 : 0.55));
     const glow = this.w(this.add.image(0, 0, "glow").setTint(col).setBlendMode(Phaser.BlendModes.ADD).setScale(kind === PROJ.FIREBALL ? 0.45 : 0.22).setAlpha(0.8).setDepth(9105));
     const trail = this.w(
@@ -1368,7 +1395,7 @@ export class GameScene extends Phaser.Scene {
         speed: { min: 2, max: 10 },
         scale: { start: kind === PROJ.FIREBALL ? 1.6 : 1, end: 0 },
         alpha: { start: 0.9, end: 0 },
-        tint: kind === PROJ.FIREBALL ? [0xfff2a0, 0xff9030, 0xff3010] : col,
+        tint: kind === PROJ.FIREBALL ? [0xffffff, 0x9fe0ff, 0x2a7ae0] : col,
         frequency: kind === PROJ.FIREBALL ? 12 : 24,
         blendMode: "ADD",
       }),
@@ -1484,7 +1511,7 @@ export class GameScene extends Phaser.Scene {
       p.swirl.setAlpha(open ? 0.85 : 0.12);
       p.swirl2.setAlpha(open ? 0.5 + Math.sin(time / 150) * 0.2 : 0);
       p.glow.setAlpha(open ? 0.55 + Math.sin(time / 300) * 0.12 : 0.1).setScale(open ? 0.9 : 0.4);
-      p.base.setTint(open ? 0xb07aff : 0x4a3a5a).setAlpha(open ? 0.9 : 0.5);
+      p.base.setTint(open ? 0xcfeeff : 0x3a4054).setAlpha(open ? 0.9 : 0.5);
     }
   }
 
@@ -1519,7 +1546,7 @@ export class GameScene extends Phaser.Scene {
       if (p.state !== PS.ALIVE || !p.extract) continue;
       const X = i === this.me && this.pred ? px(this.pred.x) : px(p.x);
       const Y = i === this.me && this.pred ? px(this.pred.y) : px(p.y);
-      g.lineStyle(2, 0xc9a2ff, 0.9);
+      g.lineStyle(2, 0x9fe0ff, 0.9);
       g.beginPath();
       g.arc(X, Y - 8, 14, -Math.PI / 2, -Math.PI / 2 + (p.extract / EXTRACT_TICKS) * Math.PI * 2, false);
       g.strokePath();
@@ -1539,7 +1566,7 @@ export class GameScene extends Phaser.Scene {
     const corr = corruption(w) / 100;
     const rt = this.darkRT;
     rt.clear();
-    rt.fill(0x05030a, Math.min(0.95, 0.88 + corr * 0.06));
+    rt.fill(0x03050c, Math.min(0.95, 0.88 + corr * 0.06));
     const lights: Light[] = [...this.staticLights];
     // Players carry light; it shrinks as corruption rises.
     for (let i = 0; i < 4; i++) {
@@ -1665,7 +1692,7 @@ export class GameScene extends Phaser.Scene {
         best = d;
         if (c.state === CHEST_STATE.OPEN) prompt = null;
         else if (c.state === CHEST_STATE.PENDING) prompt = "Rolling MagicBlock VRF…";
-        else if (c.tier === CHEST.BOSS && bossAlive) prompt = "Sealed — defeat The Hollow King";
+        else if (c.tier === CHEST.BOSS && bossAlive) prompt = "Sealed — purify The Hollow King";
         else prompt = `[E] Open ${c.tier === CHEST.VAULT ? "vault chest" : c.tier === CHEST.GOLD ? "gilded chest" : c.tier === CHEST.BOSS ? "the King's hoard" : "chest"}`;
       }
       const d = w.door;
@@ -1678,7 +1705,7 @@ export class GameScene extends Phaser.Scene {
         for (const p of w.portals) {
           if (!p.tx && !p.ty) continue;
           if (Math.hypot(p.tx * TILE + 128 - pos.x, p.ty * TILE + 128 - pos.y) < PORTAL_RADIUS + 128) {
-            prompt = portalsOpen(w) ? "Hold still in the portal to escape" : `Portal dormant — opens in ${fmtTime(w.portalTick - w.tick)}`;
+            prompt = portalsOpen(w) ? "Hold still in the spirit gate to cross over" : `Spirit gate sealed — opens in ${fmtTime(w.portalTick - w.tick)}`;
           }
         }
       }
