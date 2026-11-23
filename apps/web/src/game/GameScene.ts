@@ -183,8 +183,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    if (!this.textures.exists("dungeon")) this.load.image("dungeon", "/assets/0x72/0x72_DungeonTilesetII_v1.7.png");
-    if (!this.cache.text.exists("tilelist")) this.load.text("tilelist", "/assets/0x72/tile_list_v1.7.txt");
+    if (!this.textures.exists("dungeon")) this.load.image("dungeon", `${import.meta.env.BASE_URL}assets/0x72/0x72_DungeonTilesetII_v1.7.png`);
+    if (!this.cache.text.exists("tilelist")) this.load.text("tilelist", `${import.meta.env.BASE_URL}assets/0x72/tile_list_v1.7.txt`);
   }
 
   create() {

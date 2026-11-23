@@ -32,7 +32,7 @@ export function CryptScene({ focus = -1, dim = 0, heroes = true }: CryptScenePro
     const ctx = c.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     const img = new Image();
-    img.src = "/assets/0x72/0x72_DungeonTilesetII_v1.7.png";
+    img.src = `${import.meta.env.BASE_URL}assets/0x72/0x72_DungeonTilesetII_v1.7.png`;
 
     // Static layer: walls, floor, gate, decor.
     const stat = document.createElement("canvas");

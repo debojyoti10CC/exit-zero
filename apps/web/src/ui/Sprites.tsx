@@ -65,7 +65,7 @@ let atlas: HTMLImageElement | null = null;
 function atlasImg() {
   if (!atlas) {
     atlas = new Image();
-    atlas.src = "/assets/0x72/0x72_DungeonTilesetII_v1.7.png";
+    atlas.src = `${import.meta.env.BASE_URL}assets/0x72/0x72_DungeonTilesetII_v1.7.png`;
   }
   return atlas;
 }

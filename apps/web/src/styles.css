@@ -1264,7 +1264,7 @@ table.t tr.me td {
 
 .sprite {
   display: inline-block;
-  background-image: url(/assets/0x72/0x72_DungeonTilesetII_v1.7.png);
+  background-image: var(--atlas-url);
   background-repeat: no-repeat;
 }
 

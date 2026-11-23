@@ -7,6 +7,12 @@ Anything you carry is at risk until you escape.
 
 > Built for Solana Blitz v10 (Entertainment Finance). No game server: the rollup *is* the server.
 
+**▶ Play now: https://debojyoti10cc.github.io/exit-zero/** — no wallet or SOL needed (a guest key is created in your browser; Phantom and other Solana wallets also work). Online matches run on Solana devnet + the MagicBlock devnet-as rollup; *Practice* runs the same rules locally against bots.
+
+Program: [`3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi`](https://explorer.solana.com/address/3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi?cluster=devnet) (devnet)
+
+Measured on devnet: world tick ~26k CU (crank-driven, ~10/s), move ~15k CU, attack ~9k CU, chest VRF request ~129k CU, ~190 ms round trip.
+
 ## What happens on-chain
 
 | Piece | How |

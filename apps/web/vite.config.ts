@@ -6,6 +6,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
   plugins: [react(), wasm(), topLevelAwait(), nodePolyfills({ include: ["buffer", "crypto", "stream", "util"] })],
+  base: process.env.VITE_BASE || "/",
   server: { port: 5173, host: true },
   build: { target: "es2022", chunkSizeWarningLimit: 4000 },
 });

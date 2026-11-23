@@ -132,4 +132,5 @@ export function installPixelKit() {
   set("--px-tag-green", tagFrame("#5fd16b"));
   set("--px-tag-blood", tagFrame(PAL.blood2));
   set("--px-tag-stone", tagFrame(PAL.stone2));
+  set("--atlas-url", `${import.meta.env.BASE_URL}assets/0x72/0x72_DungeonTilesetII_v1.7.png`);
 }
