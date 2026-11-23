@@ -232,3 +232,16 @@ fn isqrt_is_exact_floor() {
         assert!(s * s <= n && (s + 1) * (s + 1) > n);
     }
 }
+
+/// Offsets used by scripts reading raw room accounts.
+#[test]
+fn raw_offsets() {
+    let w = ez_core::World::default();
+    let base = &w as *const _ as usize;
+    let p0 = &w.players[0] as *const _ as usize - base;
+    let p1 = &w.players[1] as *const _ as usize - base;
+    let tick = &w.tick as *const _ as usize - base;
+    let seed_src = &w.seed_src as *const _ as usize - base;
+    eprintln!("players@{p0} stride {} tick@{tick} seed_src@{seed_src}", p1 - p0);
+    assert_eq!((p0, tick, seed_src), (100, 44, 40));
+}

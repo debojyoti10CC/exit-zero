@@ -93,11 +93,16 @@ export function App() {
   };
 
   const leaveGame = useCallback(() => {
+    const ended = session?.latest?.world.phase === PHASE.ENDED;
     session?.destroy();
     setSession(null);
     hud.reset();
     if (member) {
-      setScreen("lobby");
+      // A finished room is reopened for the next party; a live one keeps running.
+      if (ended) resetRoom(member.room, guestKeypair()).catch(() => {});
+      member.watcher.stop();
+      setMember(null);
+      setScreen("online");
     } else setScreen("menu");
   }, [session, member]);
 
@@ -184,12 +189,21 @@ function Online({ go, signer, cls, name, onJoined }: { go: (s: Screen) => void; 
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const me = signer.publicKey.toBase58();
+  const seen = useRef<Record<number, { tick: number; at: number }>>({});
 
   useEffect(() => {
     let alive = true;
     const load = () =>
       fetchRooms()
-        .then((r) => alive && (setRooms(r), setErr(null)))
+        .then((r) => {
+          if (!alive) return;
+          for (const room of r) {
+            const t = room.world?.tick ?? -1;
+            if (seen.current[room.id]?.tick !== t) seen.current[room.id] = { tick: t, at: Date.now() };
+          }
+          setRooms(r);
+          setErr(null);
+        })
         .catch((e) => alive && setErr(`Could not reach ${ER_RPC}: ${e.message || e}`));
     load();
     const t = setInterval(load, 2000);
@@ -222,7 +236,8 @@ function Online({ go, signer, cls, name, onJoined }: { go: (s: Screen) => void; 
     try {
       await resetRoom(r.id, guestKeypair());
     } catch (e: any) {
-      setErr(e.message || String(e));
+      const m = String(e.message || e);
+      setErr(m.includes("WrongPhase") || m.includes("0x1770") ? `Crypt ${r.id + 1} is still in use — try again in a minute.` : m);
     } finally {
       setBusy(null);
     }
@@ -249,7 +264,8 @@ function Online({ go, signer, cls, name, onJoined }: { go: (s: Screen) => void; 
           const w = r.world;
           const mine = r.wallets.includes(me);
           const canJoin = r.ok && w && ((w.phase === PHASE.LOBBY && r.players.length < 4) || mine);
-          const canRecycle = r.ok && w && ((w.phase === PHASE.ENDED && w.settled) || (w.phase === PHASE.LOBBY && r.players.length === 0 && w.nonce > 0));
+          const frozen = !!w && w.phase === PHASE.RUNNING && seen.current[r.id]?.tick === w.tick && Date.now() - seen.current[r.id].at > 5000;
+          const canRecycle = r.ok && w && (w.phase === PHASE.ENDED || (w.phase === PHASE.SEEDING && w.seedSrc === 0) || frozen);
           return (
             <div key={r.id} className="room-card px-slot">
               <div className="mono gold" style={{ width: 92, fontSize: 16, textShadow: "var(--sh)" }}>
@@ -268,7 +284,7 @@ function Online({ go, signer, cls, name, onJoined }: { go: (s: Screen) => void; 
               <a className="small" href={accountExplorer(r.pda, true)} target="_blank" rel="noreferrer">
                 account
               </a>
-              {canRecycle && !mine ? (
+              {canRecycle && (!mine || w!.phase === PHASE.ENDED || frozen) ? (
                 <button className="btn small" disabled={busy !== null} onClick={() => recycle(r)}>
                   Reopen
                 </button>

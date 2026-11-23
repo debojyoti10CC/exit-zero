@@ -502,7 +502,7 @@ export function ResultsScroll({
         <div className="row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
           {session.mode === "online" && world.phase !== PHASE.ENDED && <span className="muted small grow">Others are still inside. Standings update live.</span>}
           <button className={`btn ${onAgain ? "" : "primary"}`} onClick={onExit}>
-            {session.mode === "practice" ? "Menu" : "Back to lobby"}
+            {session.mode === "practice" ? "Menu" : "Crypt list"}
           </button>
           {onAgain && (
             <button className="btn primary" onClick={onAgain} autoFocus>

@@ -35,6 +35,8 @@ pub const VAULT_SEED: &[u8] = b"vault";
 pub const HALL_MAX: usize = 64;
 pub const VAULT_PAGE_MAX: usize = 96;
 pub const MAX_SESSION_SECS: i64 = 4 * 60 * 60;
+/// Rollup slots (~50ms each) of inactivity before a stuck room may be recycled.
+pub const RECYCLE_SLOTS: u64 = 1200;
 
 #[ephemeral]
 #[program]
@@ -165,13 +167,16 @@ pub mod exit_zero {
             let room = &mut ctx.accounts.room;
             let p = session_slot(room, &ctx.accounts.signer.key())?;
             let info = room.to_account_info();
-        let mut data = info.try_borrow_mut_data()?;
-        let world = world_of(&mut data)?;
+            let mut data = info.try_borrow_mut_data()?;
+            let world = world_of(&mut data)?;
             require!(world.phase == PHASE_LOBBY || (world.phase == PHASE_SEEDING && world.seed_src == 0), GameError::WrongPhase);
             require!(world.host == p, GameError::NotHost);
             world.phase = PHASE_SEEDING;
             world.seed_src = 0;
-                    }
+            drop(data);
+            // Remember when the seed was requested so an abandoned request can be recycled.
+            room.last_tick_slot = Clock::get()?.slot;
+        }
         let ix = create_request_randomness_ix_const(
             RequestRandomnessParams {
                 payer: ctx.accounts.signer.key(),
@@ -392,7 +397,14 @@ pub mod exit_zero {
         // A lobby or seeding room that everyone abandoned can also be recycled after its sessions expire.
         let now = Clock::get()?.unix_timestamp;
         let stale = world.phase != PHASE_RUNNING && room.session_exp.iter().all(|e| *e < now);
-        require!(ended || empty_lobby || stale, GameError::WrongPhase);
+        // ~1 minute of rollup slots with no progress: a seed that never arrived, or a
+        // finished run nobody settled, can be recycled by anyone.
+        let idle = Clock::get()?.slot > room.last_tick_slot.saturating_add(RECYCLE_SLOTS);
+        let seed_lost = world.phase == PHASE_SEEDING && world.seed_src == 0 && idle;
+        let ended_unsettled = world.phase == PHASE_ENDED && idle;
+        // A run whose world stopped ticking (no crank, everyone gone) is abandoned.
+        let abandoned = world.phase == PHASE_RUNNING && idle;
+        require!(ended || empty_lobby || stale || seed_lost || ended_unsettled || abandoned, GameError::WrongPhase);
         let nonce = world.nonce.wrapping_add(1);
         sim::reset_lobby(&mut *world, nonce);
         room.wallets = [Pubkey::default(); MAX_PLAYERS];

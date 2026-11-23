@@ -50,8 +50,20 @@ async function blockhash() {
   return bh.hash;
 }
 
+let uniq = 0;
 export async function sendEr(ixs: TransactionInstruction[], payer: PublicKey, sign: (tx: Transaction) => Promise<Transaction>, confirm = false) {
   const tx = new Transaction();
+  // Identical actions within one blockhash would produce identical signatures and be
+  // dropped as duplicates; a varying compute limit makes every transaction unique.
+  const hasBudget = ixs.some((i) => i.programId.equals(ComputeBudgetProgram.programId));
+  if (!hasBudget) tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 + (uniq++ % 50_000) }));
+  else {
+    ixs = ixs.map((i) => {
+      if (!i.programId.equals(ComputeBudgetProgram.programId)) return i;
+      const units = i.data.readUInt32LE(1) - (uniq++ % 5_000);
+      return ComputeBudgetProgram.setComputeUnitLimit({ units });
+    });
+  }
   tx.add(...ixs);
   tx.feePayer = payer;
   tx.recentBlockhash = await blockhash();
