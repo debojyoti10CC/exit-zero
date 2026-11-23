@@ -4,7 +4,7 @@ import { WalletMultiButton as WMB } from "@solana/wallet-adapter-react-ui";
 const WalletMultiButton = WMB as any;
 import type { Keypair } from "@solana/web3.js";
 import Phaser from "phaser";
-import { CryptScene } from "./ui/CryptScene";
+import { SpiritTownScene as CryptScene } from "./ui/SpiritTownScene";
 import { Title, HeroSelect, PracticeSetup, ResultsScroll, type TitlePick } from "./ui/Screens";
 import { awardRun, type RunAward } from "./game/progress";
 import type { ContractResult } from "./game/contracts";

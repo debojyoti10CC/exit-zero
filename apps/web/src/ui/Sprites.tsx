@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import tileList from "../../public/assets/0x72/tile_list_v1.7.txt?raw";
 import { ICONS } from "../game/textures";
 import { ITEM, RARITY_CSS } from "../game/world";
+import { heroFrames } from "../game/reaperArt";
 
 export const FRAMES: Record<string, [number, number, number, number]> = {};
 for (const line of tileList.split(/\r?\n/)) {
@@ -28,7 +29,45 @@ function useTick() {
 }
 
 /** Animated sprite from the 0x72 atlas, e.g. base="knight_m_run_anim". */
+/** Theme heroes: the dungeon-pack hero names map to the original chibi reapers. */
+function reaperClass(base: string): number {
+  if (base.startsWith("knight")) return 0;
+  if (base.startsWith("wizzard")) return 1;
+  if (base.startsWith("elf")) return 2;
+  return -1;
+}
+
+function HeroCanvas({ cls, run, still, scale, flip, style }: { cls: number; run: boolean; still: boolean; scale: number; flip: boolean; style?: React.CSSProperties }) {
+  const t = useTick();
+  const ref = useRef<HTMLCanvasElement>(null);
+  const frames = heroFrames(cls);
+  const idx = still ? 0 : run ? 2 + (t % 4) : Math.floor(t / 3) % 2;
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(frames[idx], 0, 0, c.width, c.height);
+  }, [idx, cls]);
+  return (
+    <canvas
+      ref={ref}
+      width={16 * Math.round(scale)}
+      height={24 * Math.round(scale)}
+      className="hero-px"
+      style={{ width: 16 * scale, height: 24 * scale, transform: flip ? "scaleX(-1)" : undefined, ...style }}
+    />
+  );
+}
+
 export function Sprite({ base, frames = 4, scale = 4, flip = false, style }: { base: string; frames?: number; scale?: number; flip?: boolean; style?: React.CSSProperties }) {
+  const cls = reaperClass(base);
+  if (cls >= 0) return <HeroCanvas cls={cls} run={base.includes("_run")} still={frames <= 1} scale={scale} flip={flip} style={style} />;
+  return <AtlasSprite base={base} frames={frames} scale={scale} flip={flip} style={style} />;
+}
+
+function AtlasSprite({ base, frames = 4, scale = 4, flip = false, style }: { base: string; frames?: number; scale?: number; flip?: boolean; style?: React.CSSProperties }) {
   const t = useTick();
   const name = frames > 1 ? `${base}_f${t % frames}` : base;
   const f = FRAMES[name] || FRAMES[`${base}_f0`];

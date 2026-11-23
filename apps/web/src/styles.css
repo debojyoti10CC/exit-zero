@@ -1468,9 +1468,11 @@ table.t tr.me td {
   }
 }
 
-/* Spirit-reaper theme: heroes wear ink-black robes everywhere in the UI. */
-.sprite {
-  filter: saturate(0.25) brightness(0.68) contrast(1.3) drop-shadow(0 0 0 transparent);
+/* Spirit-reaper theme: original chibi reaper art is drawn on canvases. */
+.hero-px {
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 1;
 }
 .logo .zero {
   color: #9fe0ff;

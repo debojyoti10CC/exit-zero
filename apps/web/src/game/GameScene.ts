@@ -3,6 +3,7 @@ import { makeAnims, makeTextures, registerAtlas } from "./textures";
 import { sfx } from "./audio";
 import { hud, minimap } from "./hudStore";
 import { ContractTracker } from "./contracts";
+import { heroFrames, hollowFrames, bladeTexture } from "./reaperArt";
 import type { GameSession, Snapshot } from "./session";
 import {
   World, Player, Monster, Drop, isWall, MAP_W, MAP_H, TILE, U2PX, PX, CLASSES, MON, PROJ, ITEM, CHEST, CHEST_STATE, PS, PHASE, EV, MS,
@@ -195,6 +196,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.textures.get("dungeon").has("floor_1")) registerAtlas(this, this.cache.text.get("tilelist"));
     if (!this.textures.exists("light")) makeTextures(this);
     makeAnims(this);
+    this.registerReaperArt();
 
     const cam = this.cameras.main;
     cam.setZoom(ZOOM);
@@ -257,6 +259,28 @@ export class GameScene extends Phaser.Scene {
     if (this.session.latest) this.onSnapshot(this.session.latest);
     this.events.once("shutdown", () => this.cleanup());
     sfx.startAmbience();
+  }
+
+  /** Registers the theme's original reaper and Hollow pixel art as textures + animations. */
+  registerReaperArt() {
+    const add = (key: string, c: HTMLCanvasElement) => {
+      if (!this.textures.exists(key)) this.textures.addCanvas(key, c);
+    };
+    for (let cls = 0; cls < 3; cls++) {
+      heroFrames(cls).forEach((c, i) => add(`rh${cls}_${i}`, c));
+      if (!this.anims.exists(`rh${cls}_idle`)) {
+        this.anims.create({ key: `rh${cls}_idle`, frames: [0, 1].map((i) => ({ key: `rh${cls}_${i}` })), frameRate: 3, repeat: -1 });
+        this.anims.create({ key: `rh${cls}_run`, frames: [2, 3, 4, 5].map((i) => ({ key: `rh${cls}_${i}` })), frameRate: 11, repeat: -1 });
+      }
+    }
+    for (let k = 1; k <= 5; k++) {
+      hollowFrames(k).forEach((c, i) => add(`hol${k}_${i}`, c));
+      if (!this.anims.exists(`hol${k}_idle`)) {
+        this.anims.create({ key: `hol${k}_idle`, frames: [0, 1].map((i) => ({ key: `hol${k}_${i}` })), frameRate: 3, repeat: -1 });
+        this.anims.create({ key: `hol${k}_run`, frames: [0, 1].map((i) => ({ key: `hol${k}_${i}` })), frameRate: 8, repeat: -1 });
+      }
+    }
+    add("nodachi", bladeTexture());
   }
 
   cleanup() {
@@ -1183,7 +1207,7 @@ export class GameScene extends Phaser.Scene {
       const hero = HERO[p.cls][i % 2];
       const alive = p.state === PS.ALIVE;
       if (alive) {
-        const anim = moved ? `${hero}_run` : `${hero}_idle`;
+        const anim = moved ? `rh${p.cls}_run` : `rh${p.cls}_idle`;
         if (v.sprite.anims.currentAnim?.key !== anim) v.sprite.play(anim, true);
       }
       const aim = i === this.me ? this.aim : p.aim;
@@ -1213,12 +1237,12 @@ export class GameScene extends Phaser.Scene {
       v.sprite.setAlpha(invuln ? 0.55 : 1);
       if (alive) {
         if (performance.now() < v.flashUntil) v.sprite.setTintFill(0xffffff);
-        else v.sprite.setTint(ROBE_TINT);
+        else v.sprite.clearTint();
       }
       if (v.state !== p.state) {
         v.state = p.state;
         if (p.state === PS.DEAD) {
-          v.sprite.stop().setFrame(`${hero}_idle_anim_f0`).setTint(0x605060);
+          v.sprite.stop().setTexture(`rh${p.cls}_0`).setTint(0x605060);
           this.tweens.add({ targets: v.sprite, angle: faceLeft ? -90 : 90, y: Y + 8, duration: 350, ease: "Bounce.easeOut" });
           this.w(this.add.image(X, Y + 2, "dungeon", "skull").setDepth(Y));
           v.ring.setVisible(false);
@@ -1244,8 +1268,8 @@ export class GameScene extends Phaser.Scene {
     const hero = HERO[p.cls][i % 2];
     const shadow = this.w(this.add.image(0, 0, "shadow").setDepth(2));
     const ring = this.w(this.add.ellipse(0, 0, 14, 5).setStrokeStyle(1, PLAYER_COLORS[i], 0.9).setDepth(2));
-    const sprite = this.w(this.add.sprite(0, 0, "dungeon", `${hero}_idle_anim_f0`).setOrigin(0.5, 1).play(`${hero}_idle`));
-    const weapon = this.w(this.add.image(0, 0, "dungeon", WEAPON[p.cls]).setOrigin(0.5, 0.92).setScale(p.cls === CLASS_ROGUE ? 0.7 : p.cls === CLASS_ARCANIST ? 0.7 : 0.85).setTint(p.cls === CLASS_ARCANIST ? 0x9fe0ff : 0xffffff));
+    const sprite = this.w(this.add.sprite(0, 0, `rh${p.cls}_0`).setOrigin(0.5, 1).play(`rh${p.cls}_idle`));
+    const weapon = this.w((p.cls === CLASS_VANGUARD ? this.add.image(0, 0, "nodachi") : this.add.image(0, 0, "dungeon", WEAPON[p.cls])).setOrigin(0.5, 0.92).setScale(p.cls === CLASS_ROGUE ? 0.7 : p.cls === CLASS_ARCANIST ? 0.7 : 1).setTint(p.cls === CLASS_ARCANIST ? 0x9fe0ff : 0xffffff));
     const aura = this.w(this.add.image(0, 0, "ring").setTint(0x6ac8ff).setScale(0.38).setBlendMode(Phaser.BlendModes.ADD).setDepth(9200).setVisible(false));
     const label = this.u(
       this.add
@@ -1297,7 +1321,7 @@ export class GameScene extends Phaser.Scene {
       if (dead) continue;
       const moving = Math.abs(ma.x - m.x) + Math.abs(ma.y - m.y) > 2;
       const base = monsterAnimBase(m.kind);
-      const anim = m.kind === MON.NECRO ? "necro" : moving ? `${base}_run` : `${base}_idle`;
+      const anim = moving ? `hol${m.kind}_run` : `hol${m.kind}_idle`;
       if (v.sprite.anims.currentAnim?.key !== anim) v.sprite.play(anim, true);
       const ar = angleRad(m.aim);
       v.sprite.setFlipX(Math.cos(ar) < 0);
@@ -1310,7 +1334,7 @@ export class GameScene extends Phaser.Scene {
       else if (windup) v.sprite.setTint(0xff8080);
       else if (B.tick < m.stunUntil) v.sprite.setTint(0x9ab0ff);
       else if (m.elite) v.sprite.setTint(0xffb0b0);
-      else v.sprite.setTint(HOLLOW_TINT[m.kind] ?? 0xffffff);
+      else v.sprite.clearTint();
       if (!windup && v.bang) {
         v.bang.destroy();
         v.bang = undefined;
@@ -1323,9 +1347,8 @@ export class GameScene extends Phaser.Scene {
   makeMonster(i: number, m: Monster): MonsterView {
     const base = monsterAnimBase(m.kind);
     const big = m.kind === MON.BRUTE || m.kind === MON.KING;
-    const frame = m.kind === MON.NECRO ? "necromancer_anim_f0" : `${monsterFrameBase(m.kind)}_idle_anim_f0`;
-    const sprite = this.w(this.add.sprite(0, 0, "dungeon", frame).setOrigin(0.5, 1));
-    sprite.play(m.kind === MON.NECRO ? "necro" : `${base}_idle`);
+    const sprite = this.w(this.add.sprite(0, 0, `hol${m.kind}_0`).setOrigin(0.5, 1));
+    sprite.play(`hol${m.kind}_idle`);
     if (m.elite && !big) sprite.setScale(1.25);
     if (m.kind === MON.KING) sprite.setScale(1.35);
     const shadow = this.w(this.add.image(0, 0, "shadow").setScale(big ? 2.2 : 1).setDepth(2));
