@@ -206,3 +206,29 @@ fn boss_fight_does_not_panic() {
         }
     }
 }
+
+/// The raw (zero-copy) layout must be identical on every target and round-trip exactly.
+#[test]
+fn raw_layout_roundtrip() {
+    let w = new_world(42, 3);
+    let mut buf = vec![0u8; ez_core::WORLD_RAW_SIZE + 8];
+    assert!(w.write_raw(&mut buf));
+    let back = ez_core::World::from_raw_copy(&buf).unwrap();
+    assert_eq!(*back, w);
+    eprintln!("WORLD_RAW_SIZE = {} align {}", ez_core::WORLD_RAW_SIZE, ez_core::WORLD_ALIGN);
+}
+
+#[test]
+fn isqrt_is_exact_floor() {
+    use ez_core::math::isqrt;
+    let mut r = Rng::new(9);
+    for _ in 0..200_000 {
+        let n = (r.next_u64() >> (r.below(60) + 1)) as i64;
+        let s = isqrt(n);
+        assert!(s * s <= n && (s + 1) * (s + 1) > n, "n {n} s {s}");
+    }
+    for n in 0..5000i64 {
+        let s = isqrt(n);
+        assert!(s * s <= n && (s + 1) * (s + 1) > n);
+    }
+}

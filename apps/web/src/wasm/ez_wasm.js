@@ -30,17 +30,6 @@ export function angle_to(ax, ay, bx, by) {
     return ret;
 }
 
-/**
- * Value of an item, for UI.
- * @param {number} kind
- * @param {number} rarity
- * @returns {number}
- */
-export function item_value(kind, rarity) {
-    const ret = wasm.item_value(kind, rarity);
-    return ret >>> 0;
-}
-
 let WASM_VECTOR_LEN = 0;
 
 function passArray8ToWasm0(arg, malloc) {
@@ -59,6 +48,33 @@ function takeFromExternrefTable0(idx) {
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+/**
+ * Converts the on-chain raw layout into the compact layout the UI decoder reads.
+ * @param {Uint8Array} raw
+ * @returns {Uint8Array}
+ */
+export function raw_to_compact(raw) {
+    const ptr0 = passArray8ToWasm0(raw, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.raw_to_compact(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * Value of an item, for UI.
+ * @param {number} kind
+ * @param {number} rarity
+ * @returns {number}
+ */
+export function item_value(kind, rarity) {
+    const ret = wasm.item_value(kind, rarity);
+    return ret >>> 0;
 }
 
 let cachedInt32ArrayMemory0 = null;
@@ -178,6 +194,16 @@ export class Sim {
         return ret >>> 0;
     }
     /**
+     * @param {Uint8Array} raw
+     * @returns {boolean}
+     */
+    replace_raw(raw) {
+        const ptr0 = passArray8ToWasm0(raw, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sim_replace_raw(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
      * @param {number} chest
      * @param {Uint8Array} rnd
      * @returns {boolean}
@@ -280,6 +306,20 @@ export class Sim {
         return ret;
     }
     /**
+     * Loads the zero-copy layout read straight from the room account.
+     * @param {Uint8Array} raw
+     * @returns {Sim}
+     */
+    static load_raw(raw) {
+        const ptr0 = passArray8ToWasm0(raw, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sim_load_raw(ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return Sim.__wrap(ret[0]);
+    }
+    /**
      * Practice run: the local player is slot 0, `bots` rival adventurers fill the rest.
      * @param {Uint8Array} seed
      * @param {number} _class
@@ -298,6 +338,13 @@ export class Sim {
             throw takeFromExternrefTable0(ret[1]);
         }
         return Sim.__wrap(ret[0]);
+    }
+    /**
+     * @returns {number}
+     */
+    static raw_size() {
+        const ret = wasm.sim_raw_size();
+        return ret >>> 0;
     }
     tick_only() {
         wasm.sim_tick_only(this.__wbg_ptr);

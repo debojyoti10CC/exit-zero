@@ -24,7 +24,7 @@ const er = new Connection(ER, "confirmed");
 const disc = Object.fromEntries(idl.instructions.map((i) => [i.name, Buffer.from(i.discriminator)]));
 const enc = (s) => Buffer.from(s);
 const pda = (seeds, prog = PROGRAM_ID) => PublicKey.findProgramAddressSync(seeds, prog)[0];
-const roomPda = (id) => pda([enc("room"), Buffer.from([id])]);
+const roomPda = (id) => pda([enc("room2"), Buffer.from([id])]);
 const hallPda = () => pda([enc("hall")]);
 const vaultPda = (p) => pda([enc("vault"), Buffer.from([p])]);
 const w = (pubkey, isSigner = false) => ({ pubkey, isSigner, isWritable: true });

@@ -24,17 +24,22 @@ pub fn cos256(a: u8) -> i32 {
     sin256(a.wrapping_add(64))
 }
 
+/// Floor square root. Newton's method seeded from the bit length converges in a
+/// handful of steps (the old seed `n` took ~30 on-chain iterations per call).
 pub fn isqrt(n: i64) -> i64 {
     if n <= 0 {
         return 0;
     }
-    let mut x = n;
-    let mut y = (x + 1) / 2;
-    while y < x {
+    let n = n as u64;
+    let bits = 64 - n.leading_zeros();
+    let mut x: u64 = 1u64 << ((bits + 1) / 2); // >= sqrt(n)
+    loop {
+        let y = (x + n / x) / 2;
+        if y >= x {
+            return x as i64;
+        }
         x = y;
-        y = (x + n / x) / 2;
     }
-    x
 }
 
 pub fn dist2(ax: i32, ay: i32, bx: i32, by: i32) -> i64 {

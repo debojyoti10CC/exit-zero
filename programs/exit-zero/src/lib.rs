@@ -11,7 +11,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral, vrf, vrf_callback};
+use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral, vrf};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
 #[allow(deprecated)]
 use ephemeral_rollups_sdk::crank::{ScheduleCrankCpi, ScheduleTaskArgs};
@@ -20,15 +20,15 @@ use ephemeral_rollups_sdk::vrf::consts::program_identity_pubkey;
 use ephemeral_rollups_sdk::vrf::instructions::{create_request_randomness_ix_const, RequestRandomnessParams};
 use ephemeral_rollups_sdk::vrf::types::SerializableAccountMeta;
 
-use ez_core::codec::WORLD_SIZE;
 use ez_core::sim::{self, Action};
-use ez_core::{World, MAX_PLAYERS, NAME_LEN, PHASE_ENDED, PHASE_LOBBY, PHASE_RUNNING, PHASE_SEEDING, PS_EMPTY, PS_EXTRACTED, RARITY_RARE};
+use ez_core::{World, WORLD_RAW_SIZE, MAX_PLAYERS, NAME_LEN, PHASE_ENDED, PHASE_LOBBY, PHASE_RUNNING, PHASE_SEEDING, PS_EMPTY, PS_EXTRACTED, RARITY_RARE};
 
 declare_id!("3gPCvP9DviVCg4MAwA1xcKFbvzPNubVf6rBkJFtnQ9Zi");
 
 const PROGRAM_IDENTITY: Pubkey = program_identity_pubkey(&crate::ID);
 
-pub const ROOM_SEED: &[u8] = b"room";
+/// v2: zero-copy world layout (rooms are re-created under this seed).
+pub const ROOM_SEED: &[u8] = b"room2";
 pub const HALL_SEED: &[u8] = b"hall";
 pub const VAULT_SEED: &[u8] = b"vault";
 
@@ -54,10 +54,11 @@ pub mod exit_zero {
         room.session_exp = [0; MAX_PLAYERS];
         room.last_tick_slot = 0;
         room.crank_task = 0;
+        room._pad = [0; 6];
         let world = World::new_boxed();
         let info = room.to_account_info();
         let mut data = info.try_borrow_mut_data()?;
-        world.write_to(&mut data[GameRoom::WORLD_OFFSET..]);
+        require!(world.write_raw(&mut data[GameRoom::WORLD_OFFSET..]), GameError::Corrupt);
         Ok(())
     }
 
@@ -115,39 +116,45 @@ pub mod exit_zero {
         require!(session != Pubkey::default(), GameError::BadSession);
         let wallet = ctx.accounts.wallet.key();
         let room = &mut ctx.accounts.room;
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         if let Some(i) = room.wallets.iter().position(|w| *w == wallet) {
             room.sessions[i] = session;
             room.session_exp[i] = session_exp;
             if world.phase == PHASE_LOBBY {
-                sim::set_class(&mut world, i as u8, class).map_err(sim_err)?;
+                sim::set_class(&mut *world, i as u8, class).map_err(sim_err)?;
             }
-            return store(room, &*world);
+            return Ok(());
         }
-        let slot = sim::join(&mut world, class, sanitize_name(name)).map_err(sim_err)? as usize;
+        let slot = sim::join(&mut *world, class, sanitize_name(name)).map_err(sim_err)? as usize;
         room.wallets[slot] = wallet;
         room.sessions[slot] = session;
         room.session_exp[slot] = session_exp;
-        store(room, &*world)
+        Ok(())
     }
 
     pub fn set_class(ctx: Context<SessionAct>, class: u8) -> Result<()> {
         let room = &mut ctx.accounts.room;
         let p = session_slot(room, &ctx.accounts.signer.key())?;
-        let mut world = load(room)?;
-        sim::set_class(&mut world, p, class).map_err(sim_err)?;
-        store(room, &*world)
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
+        sim::set_class(&mut *world, p, class).map_err(sim_err)?;
+        Ok(())
     }
 
     pub fn leave(ctx: Context<SessionAct>) -> Result<()> {
         let room = &mut ctx.accounts.room;
         let p = session_slot(room, &ctx.accounts.signer.key())?;
-        let mut world = load(room)?;
-        sim::leave(&mut world, p).map_err(sim_err)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
+        sim::leave(&mut *world, p).map_err(sim_err)?;
         room.wallets[p as usize] = Pubkey::default();
         room.sessions[p as usize] = Pubkey::default();
         room.session_exp[p as usize] = 0;
-        store(room, &*world)
+        Ok(())
     }
 
     /// Host locks the lobby and requests the dungeon seed from MagicBlock VRF.
@@ -157,13 +164,14 @@ pub mod exit_zero {
         {
             let room = &mut ctx.accounts.room;
             let p = session_slot(room, &ctx.accounts.signer.key())?;
-            let mut world = load(room)?;
+            let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
             require!(world.phase == PHASE_LOBBY || (world.phase == PHASE_SEEDING && world.seed_src == 0), GameError::WrongPhase);
             require!(world.host == p, GameError::NotHost);
             world.phase = PHASE_SEEDING;
             world.seed_src = 0;
-            store(room, &*world)?;
-        }
+                    }
         let ix = create_request_randomness_ix_const(
             RequestRandomnessParams {
                 payer: ctx.accounts.signer.key(),
@@ -184,20 +192,24 @@ pub mod exit_zero {
     /// VRF callback: stores the verified dungeon seed.
     pub fn seed_callback(ctx: Context<RoomCallback>, randomness: [u8; 32]) -> Result<()> {
         let room = &mut ctx.accounts.room;
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         require!(world.phase == PHASE_SEEDING, GameError::WrongPhase);
-        sim::set_seed(&mut world, randomness, 1);
-        store(room, &*world)
+        sim::set_seed(&mut *world, randomness, 1);
+        Ok(())
     }
 
     /// Generates the dungeon deterministically from the verified seed and opens it.
     pub fn begin(ctx: Context<SessionAct>) -> Result<()> {
         let room = &mut ctx.accounts.room;
         let _ = session_slot(room, &ctx.accounts.signer.key())?;
-        let mut world = load(room)?;
-        sim::begin(&mut world).map_err(sim_err)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
+        sim::begin(&mut *world).map_err(sim_err)?;
         room.last_tick_slot = Clock::get()?.slot;
-        store(room, &*world)
+        Ok(())
     }
 
     /// Schedules the world tick on the MagicBlock crank so the dungeon runs without a server.
@@ -231,13 +243,15 @@ pub mod exit_zero {
         if slot <= room.last_tick_slot {
             return Ok(());
         }
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         if world.phase != PHASE_RUNNING {
             return Ok(());
         }
         room.last_tick_slot = slot;
-        sim::tick(&mut world);
-        store(room, &*world)
+        sim::tick(&mut *world);
+        Ok(())
     }
 
     pub fn move_to(ctx: Context<SessionAct>, x: i32, y: i32, aim: u8, moving: u8) -> Result<()> {
@@ -262,10 +276,11 @@ pub mod exit_zero {
         let request = {
             let room = &mut ctx.accounts.room;
             let p = session_slot(room, &ctx.accounts.signer.key())?;
-            let mut world = load(room)?;
-            let out = sim::act(&mut world, p, Action::Interact).map_err(sim_err)?;
-            store(room, &*world)?;
-            out.request_chest
+            let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
+            let out = sim::act(&mut *world, p, Action::Interact).map_err(sim_err)?;
+                        out.request_chest
         };
         if let Some(chest) = request {
             let ix = create_request_randomness_ix_const(
@@ -289,11 +304,12 @@ pub mod exit_zero {
     /// VRF callback: rolls the chest's loot from verified randomness.
     pub fn chest_callback(ctx: Context<RoomCallback>, randomness: [u8; 32], chest: u8) -> Result<()> {
         let room = &mut ctx.accounts.room;
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         // A late callback for a chest that was re-requested is ignored, not an error.
-        if sim::resolve_chest(&mut world, chest, &randomness).is_ok() {
-            store(room, &*world)?;
-        }
+        if sim::resolve_chest(&mut *world, chest, &randomness).is_ok() {
+                    }
         Ok(())
     }
 
@@ -305,7 +321,9 @@ pub mod exit_zero {
     /// three accounts to Solana. Callable by anyone once the run has ended.
     pub fn settle(ctx: Context<Settle>) -> Result<()> {
         let room = &mut ctx.accounts.room;
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         require!(world.phase == PHASE_ENDED, GameError::WrongPhase);
         require!(world.settled == 0, GameError::AlreadySettled);
         let now = Clock::get()?.unix_timestamp;
@@ -343,7 +361,7 @@ pub mod exit_zero {
             }
         }
         world.settled = 1;
-        store(room, &*world)?;
+        drop(data);
 
         // Serialize before handing the accounts to the commit intent.
         ctx.accounts.room.exit(&crate::ID)?;
@@ -366,7 +384,9 @@ pub mod exit_zero {
     /// Re-opens a settled room for the next lobby.
     pub fn reset(ctx: Context<Tick>) -> Result<()> {
         let room = &mut ctx.accounts.room;
-        let mut world = load(room)?;
+        let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
         let ended = world.phase == PHASE_ENDED && world.settled == 1;
         let empty_lobby = world.phase == PHASE_LOBBY && world.player_count() == 0;
         // A lobby or seeding room that everyone abandoned can also be recycled after its sessions expire.
@@ -374,11 +394,11 @@ pub mod exit_zero {
         let stale = world.phase != PHASE_RUNNING && room.session_exp.iter().all(|e| *e < now);
         require!(ended || empty_lobby || stale, GameError::WrongPhase);
         let nonce = world.nonce.wrapping_add(1);
-        sim::reset_lobby(&mut world, nonce);
+        sim::reset_lobby(&mut *world, nonce);
         room.wallets = [Pubkey::default(); MAX_PLAYERS];
         room.sessions = [Pubkey::default(); MAX_PLAYERS];
         room.session_exp = [0; MAX_PLAYERS];
-        store(room, &*world)
+        Ok(())
     }
 
     /// Transfers ownership of a relic recorded in the Vault.
@@ -411,19 +431,9 @@ pub mod exit_zero {
 // Helpers
 // ----------------------------------------------------------------------
 
-fn load(room: &Account<GameRoom>) -> Result<Box<World>> {
-    let mut w = World::new_boxed();
-    let info = room.to_account_info();
-    let data = info.try_borrow_data()?;
-    w.decode_into(&data[GameRoom::WORLD_OFFSET..]).map_err(|_| error!(GameError::Corrupt))?;
-    Ok(w)
-}
-
-fn store(room: &Account<GameRoom>, w: &World) -> Result<()> {
-    let info = room.to_account_info();
-    let mut data = info.try_borrow_mut_data()?;
-    require!(w.write_to(&mut data[GameRoom::WORLD_OFFSET..]), GameError::Corrupt);
-    Ok(())
+/// Zero-copy view of the match world inside the room account.
+fn world_of(data: &mut [u8]) -> Result<&mut World> {
+    World::from_raw_mut(&mut data[GameRoom::WORLD_OFFSET..]).ok_or_else(|| error!(GameError::Corrupt))
 }
 
 fn session_slot(room: &GameRoom, signer: &Pubkey) -> Result<u8> {
@@ -440,9 +450,11 @@ fn session_slot(room: &GameRoom, signer: &Pubkey) -> Result<u8> {
 fn act(ctx: Context<SessionAct>, action: Action) -> Result<()> {
     let room = &mut ctx.accounts.room;
     let p = session_slot(room, &ctx.accounts.signer.key())?;
-    let mut world = load(room)?;
-    sim::act(&mut world, p, action).map_err(sim_err)?;
-    store(room, &*world)
+    let info = room.to_account_info();
+        let mut data = info.try_borrow_mut_data()?;
+        let world = world_of(&mut data)?;
+    sim::act(&mut *world, p, action).map_err(sim_err)?;
+    Ok(())
 }
 
 fn sanitize_name(mut n: [u8; NAME_LEN]) -> [u8; NAME_LEN] {
@@ -481,13 +493,17 @@ pub struct GameRoom {
     pub session_exp: [i64; MAX_PLAYERS],
     pub last_tick_slot: u64,
     pub crank_task: i64,
+    /// Pads the header so the world starts 8-byte aligned.
+    pub _pad: [u8; 6],
 }
 
 impl GameRoom {
-    pub const HEADER: usize = 1 + 1 + 32 * MAX_PLAYERS + 32 * MAX_PLAYERS + 8 * MAX_PLAYERS + 8 + 8;
+    pub const HEADER: usize = 1 + 1 + 32 * MAX_PLAYERS + 32 * MAX_PLAYERS + 8 * MAX_PLAYERS + 8 + 8 + 6;
     pub const WORLD_OFFSET: usize = 8 + Self::HEADER;
-    pub const SPACE: usize = Self::WORLD_OFFSET + WORLD_SIZE;
+    pub const SPACE: usize = Self::WORLD_OFFSET + WORLD_RAW_SIZE;
 }
+
+const _: () = assert!(GameRoom::WORLD_OFFSET % 8 == 0);
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default)]
 pub struct HallEntry {
@@ -677,10 +693,15 @@ fn is_vrf_queue(k: &Pubkey) -> bool {
     *k == c::DEFAULT_QUEUE || *k == c::DEFAULT_EPHEMERAL_QUEUE || *k == c::DEFAULT_TEST_QUEUE || *k == c::DEFAULT_EPHEMERAL_TEST_QUEUE
 }
 
-/// `#[vrf_callback]` adds the scoped VRF identity signer, so only the VRF program can call these.
-#[vrf_callback]
+/// Scoped VRF identity for this program, computed at compile time. (`#[vrf_callback]`
+/// derives it inside the constraint, which runs the PDA search on-chain — ~270k CU.)
+const VRF_IDENTITY: Pubkey = Pubkey::new_from_array(ephemeral_rollups_sdk::vrf::consts::scoped_vrf_identity_const(&crate::ID).0);
+
+/// Only the VRF program can sign as our scoped identity, so only it can call these callbacks.
 #[derive(Accounts)]
 pub struct RoomCallback<'info> {
+    #[account(address = VRF_IDENTITY)]
+    pub vrf_program_identity: Signer<'info>,
     #[account(mut)]
     pub room: Account<'info, GameRoom>,
 }

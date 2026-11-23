@@ -987,10 +987,16 @@ fn flow_field(w: &World, max_depth: u16) -> Vec<u16> {
     f
 }
 
+/// Cheap check: is any living player within `r` units (squared compare, no sqrt)?
+fn players_within(w: &World, x: i32, y: i32, r: i32) -> bool {
+    let r2 = r as i64 * r as i64;
+    w.players.iter().any(|p| p.alive() && dist2(x, y, p.x, p.y) <= r2)
+}
+
 fn update_monsters(w: &mut World) {
-    let any_active = w.monsters.iter().any(|m| m.alive() && m.state != MS_IDLE);
-    let flow = if any_active { flow_field(w, 18) } else { Vec::new() };
+    let mut flow: Option<Vec<u16>> = None;
     let corruption = w.corruption() as i32;
+
     for mi in 0..MAX_MONSTERS {
         let m = w.monsters[mi];
         if !m.alive() {
@@ -1000,26 +1006,31 @@ fn update_monsters(w: &mut World) {
             continue;
         }
         let st = &MONSTERS[m.kind as usize];
+        if m.state == MS_IDLE && !players_within(w, m.x, m.y, st.aggro + TILE) {
+            continue;
+        }
 
         // Target selection: keep current target while in a leash range, else nearest.
         let mut target = m.target;
         if (target as usize) < MAX_PLAYERS {
             let tp = w.players[target as usize];
-            if !tp.alive() || dist(m.x, m.y, tp.x, tp.y) > st.aggro * 3 / 2 {
+            let leash = (st.aggro * 3 / 2) as i64;
+            if !tp.alive() || dist2(m.x, m.y, tp.x, tp.y) > leash * leash {
                 target = NOBODY;
             }
         } else {
             target = NOBODY;
         }
         if target == NOBODY {
-            let mut best = i32::MAX;
+            let mut best = i64::MAX;
             for (pi, p) in w.players.iter().enumerate() {
                 if !p.alive() {
                     continue;
                 }
-                let d = dist(m.x, m.y, p.x, p.y);
-                let aggro = if m.state == MS_IDLE { st.aggro } else { st.aggro * 3 / 2 };
-                if d < aggro && d < best && (m.state != MS_IDLE || d < TILE * 3 || line_clear(w, m.x, m.y, p.x, p.y)) {
+                let d = dist2(m.x, m.y, p.x, p.y);
+                let aggro = (if m.state == MS_IDLE { st.aggro } else { st.aggro * 3 / 2 }) as i64;
+                let near3 = (TILE * 3) as i64;
+                if d < aggro * aggro && d < best && (m.state != MS_IDLE || d < near3 * near3 || line_clear(w, m.x, m.y, p.x, p.y)) {
                     best = d;
                     target = pi as u8;
                 }
@@ -1055,8 +1066,12 @@ fn update_monsters(w: &mut World) {
                 let mut away = false;
                 if st.ranged && d < TILE * 3 {
                     away = true;
-                } else if !line_clear(w, m.x, m.y, tp.x, tp.y) && !flow.is_empty() {
-                    // Follow the distance field around corners.
+                } else if !line_clear(w, m.x, m.y, tp.x, tp.y) {
+                    // Follow the distance field around corners (built once per tick, on demand).
+                    if flow.is_none() {
+                        flow = Some(flow_field(w, 14));
+                    }
+                    let flow = flow.as_ref().unwrap();
                     let (tx, ty) = (m.x.div_euclid(TILE), m.y.div_euclid(TILE));
                     let mut best = u16::MAX;
                     for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)] {
@@ -1171,10 +1186,15 @@ fn separate_monsters(w: &mut World) {
                 continue;
             }
             let (a, b) = (w.monsters[i], w.monsters[j]);
-            let d = dist(a.x, a.y, b.x, b.y);
-            if d >= min {
+            let (ddx, ddy) = (a.x - b.x, a.y - b.y);
+            if ddx.abs() >= min || ddy.abs() >= min {
                 continue;
             }
+            let d2 = ddx as i64 * ddx as i64 + ddy as i64 * ddy as i64;
+            if d2 >= (min as i64) * (min as i64) {
+                continue;
+            }
+            let d = isqrt(d2) as i32;
             let push = (min - d) / 2 + 1;
             let ang = if d == 0 { (i * 37) as u8 } else { angle_to(b.x, b.y, a.x, a.y) };
             let (px, py) = (cos256(ang) * push / 1024, sin256(ang) * push / 1024);

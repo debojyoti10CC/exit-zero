@@ -5,6 +5,10 @@
  */
 export function angle_to(ax: number, ay: number, bx: number, by: number): number;
 /**
+ * Converts the on-chain raw layout into the compact layout the UI decoder reads.
+ */
+export function raw_to_compact(raw: Uint8Array): Uint8Array;
+/**
  * Value of an item, for UI.
  */
 export function item_value(kind: number, rarity: number): number;
@@ -17,6 +21,7 @@ export class Sim {
   act_combat(p: number, kind: number, aim: number): void;
   tick_count(): number;
   static world_size(): number;
+  replace_raw(raw: Uint8Array): boolean;
   resolve_chest(chest: number, rnd: Uint8Array): boolean;
   /**
    * Wraps world bytes read from the rollup (for prediction and decoding helpers).
@@ -40,9 +45,14 @@ export class Sim {
    */
   interact(p: number): number;
   /**
+   * Loads the zero-copy layout read straight from the room account.
+   */
+  static load_raw(raw: Uint8Array): Sim;
+  /**
    * Practice run: the local player is slot 0, `bots` rival adventurers fill the rest.
    */
   static practice(seed: Uint8Array, _class: number, name: string, bots: number, quick: boolean): Sim;
+  static raw_size(): number;
   tick_only(): void;
 }
 
@@ -53,15 +63,19 @@ export interface InitOutput {
   readonly __wbg_sim_free: (a: number, b: number) => void;
   readonly angle_to: (a: number, b: number, c: number, d: number) => number;
   readonly item_value: (a: number, b: number) => number;
+  readonly raw_to_compact: (a: number, b: number) => [number, number, number, number];
   readonly sim_act_combat: (a: number, b: number, c: number, d: number) => void;
   readonly sim_act_move: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly sim_bytes: (a: number) => [number, number];
   readonly sim_interact: (a: number, b: number) => number;
   readonly sim_is_bot: (a: number, b: number) => number;
   readonly sim_load: (a: number, b: number) => [number, number, number];
+  readonly sim_load_raw: (a: number, b: number) => [number, number, number];
   readonly sim_phase: (a: number) => number;
   readonly sim_practice: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+  readonly sim_raw_size: () => number;
   readonly sim_replace: (a: number, b: number, c: number) => number;
+  readonly sim_replace_raw: (a: number, b: number, c: number) => number;
   readonly sim_resolve_chest: (a: number, b: number, c: number, d: number) => number;
   readonly sim_slide: (a: number, b: number, c: number, d: number, e: number) => [number, number];
   readonly sim_tick: (a: number) => [number, number];

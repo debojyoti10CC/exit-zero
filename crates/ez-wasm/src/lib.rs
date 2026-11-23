@@ -60,6 +60,27 @@ impl Sim {
         Ok(Sim { w, bots: [None; MAX_PLAYERS], rng: Rng::new(1) })
     }
 
+    /// Loads the zero-copy layout read straight from the room account.
+    #[wasm_bindgen]
+    pub fn load_raw(raw: &[u8]) -> Result<Sim, JsValue> {
+        let w = World::from_raw_copy(raw).ok_or_else(|| JsValue::from_str("bad raw world"))?;
+        Ok(Sim { w: *w, bots: [None; MAX_PLAYERS], rng: Rng::new(1) })
+    }
+
+    pub fn replace_raw(&mut self, raw: &[u8]) -> bool {
+        match World::from_raw_copy(raw) {
+            Some(w) => {
+                self.w = *w;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn raw_size() -> usize {
+        WORLD_RAW_SIZE
+    }
+
     pub fn replace(&mut self, bytes: &[u8]) -> bool {
         match World::decode(bytes) {
             Ok(w) => {
@@ -157,6 +178,13 @@ impl Sim {
 #[wasm_bindgen]
 pub fn angle_to(ax: i32, ay: i32, bx: i32, by: i32) -> u8 {
     ez_core::math::angle_to(ax, ay, bx, by)
+}
+
+/// Converts the on-chain raw layout into the compact layout the UI decoder reads.
+#[wasm_bindgen]
+pub fn raw_to_compact(raw: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let w = World::from_raw_copy(raw).ok_or_else(|| JsValue::from_str("bad raw world"))?;
+    Ok(w.encode())
 }
 
 /// Value of an item, for UI.

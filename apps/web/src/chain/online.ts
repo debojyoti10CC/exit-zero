@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, ComputeBudgetProgram } from "@solana/web3.js";
+﻿import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, ComputeBudgetProgram } from "@solana/web3.js";
 import { ER_RPC, ER_WS, BASE_RPC, ROOM_COUNT, VAULT_PAGES } from "./config";
 import * as P from "./program";
 import { decodeWorld, World, PHASE, PS } from "../game/world";
@@ -74,6 +74,7 @@ export interface RoomInfo {
 }
 
 export async function fetchRooms(): Promise<RoomInfo[]> {
+  await loadWasm();
   const pdas = Array.from({ length: ROOM_COUNT }, (_, i) => P.roomPda(i));
   const infos = await er.getMultipleAccountsInfo(pdas, "processed");
   return infos.map((info, id) => {
@@ -120,7 +121,8 @@ export class RoomWatcher {
   private lastUpdate = 0;
   constructor(public room: number) {}
 
-  start() {
+  async start() {
+    await loadWasm();
     const pda = P.roomPda(this.room);
     this.subId = er.onAccountChange(pda, (acc) => this.ingest(acc.data), { commitment: "processed" });
     const refresh = async () => {
@@ -245,7 +247,7 @@ export class ChainSession implements GameSession {
     if (!stalled) return;
     const leader = w.players.findIndex((p) => p.state === PS.ALIVE);
     const myTurn = leader === this.me || performance.now() - this.lastTickSeen.at > 900;
-    if (myTurn) this.send([P.ixTick(this.room)], false);
+    if (myTurn) this.send([ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }), P.ixTick(this.room)], false);
   }
 
   private send(ixs: TransactionInstruction[], measure = true) {

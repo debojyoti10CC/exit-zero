@@ -4,7 +4,8 @@ import idl from "./exit_zero.json";
 import {
   PROGRAM_ID, DELEGATION_PROGRAM, MAGIC_CONTEXT, MAGIC_PROGRAM, VRF_PROGRAM, VRF_EPHEMERAL_QUEUE, SLOT_HASHES,
 } from "./config";
-import { NAME_LEN, MAX_PLAYERS, WORLD_SIZE } from "../game/world";
+import { NAME_LEN, MAX_PLAYERS } from "../game/world";
+import { Sim, raw_to_compact } from "../wasm/ez_wasm.js";
 
 const DISC: Record<string, Uint8Array> = {};
 for (const ix of (idl as any).instructions) DISC[ix.name] = Uint8Array.from(ix.discriminator);
@@ -13,7 +14,7 @@ for (const a of (idl as any).accounts) ACC_DISC[a.name] = Uint8Array.from(a.disc
 
 const enc = new TextEncoder();
 
-export const roomPda = (id: number) => PublicKey.findProgramAddressSync([enc.encode("room"), Uint8Array.of(id)], PROGRAM_ID)[0];
+export const roomPda = (id: number) => PublicKey.findProgramAddressSync([enc.encode("room2"), Uint8Array.of(id)], PROGRAM_ID)[0];
 export const hallPda = () => PublicKey.findProgramAddressSync([enc.encode("hall")], PROGRAM_ID)[0];
 export const vaultPda = (page: number) => PublicKey.findProgramAddressSync([enc.encode("vault"), Uint8Array.of(page)], PROGRAM_ID)[0];
 export const programIdentity = () => PublicKey.findProgramAddressSync([enc.encode("identity")], PROGRAM_ID)[0];
@@ -101,15 +102,18 @@ export interface RoomHeader {
   lastTickSlot: number;
   crankTask: number;
 }
-const ROOM_HEADER = 1 + 1 + 32 * MAX_PLAYERS + 32 * MAX_PLAYERS + 8 * MAX_PLAYERS + 8 + 8;
+const ROOM_HEADER = 1 + 1 + 32 * MAX_PLAYERS + 32 * MAX_PLAYERS + 8 * MAX_PLAYERS + 8 + 8 + 6;
 export const WORLD_OFFSET = 8 + ROOM_HEADER;
 
 function eq(a: Uint8Array, b: Uint8Array) {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
-export function decodeRoom(data: Uint8Array): { header: RoomHeader; world: Uint8Array } | null {
-  if (data.length < WORLD_OFFSET + WORLD_SIZE || !eq(data.slice(0, 8), ACC_DISC.GameRoom)) return null;
+/** Decodes a room account. `world` is returned in the compact UI layout (converted
+ *  from the on-chain zero-copy layout by WASM); `raw` is the on-chain bytes. Needs loadWasm(). */
+export function decodeRoom(data: Uint8Array): { header: RoomHeader; world: Uint8Array; raw: Uint8Array } | null {
+  const rawSize = Sim.raw_size();
+  if (data.length < WORLD_OFFSET + rawSize || !eq(data.slice(0, 8), ACC_DISC.GameRoom)) return null;
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let p = 8;
   const roomId = data[p++];
@@ -123,7 +127,8 @@ export function decodeRoom(data: Uint8Array): { header: RoomHeader; world: Uint8
   const lastTickSlot = Number(dv.getBigUint64(p, true));
   p += 8;
   const crankTask = Number(dv.getBigInt64(p, true));
-  return { header: { roomId, wallets, sessions, sessionExp, lastTickSlot, crankTask }, world: data.slice(WORLD_OFFSET, WORLD_OFFSET + WORLD_SIZE) };
+  const raw = data.slice(WORLD_OFFSET, WORLD_OFFSET + rawSize);
+  return { header: { roomId, wallets, sessions, sessionExp, lastTickSlot, crankTask }, world: raw_to_compact(raw), raw };
 }
 
 export interface HallEntry {

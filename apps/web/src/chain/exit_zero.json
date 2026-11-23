@@ -55,11 +55,8 @@
       "accounts": [
         {
           "name": "vrf_program_identity",
-          "docs": [
-            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
-            "the callback was issued by the VRF program for this program."
-          ],
-          "signer": true
+          "signer": true,
+          "address": "8xsvrdWdM4JXkGZpGiXCutiCWa4Nto89ja9fpC8EV6MB"
         },
         {
           "name": "room",
@@ -1184,11 +1181,8 @@
       "accounts": [
         {
           "name": "vrf_program_identity",
-          "docs": [
-            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
-            "the callback was issued by the VRF program for this program."
-          ],
-          "signer": true
+          "signer": true,
+          "address": "8xsvrdWdM4JXkGZpGiXCutiCWa4Nto89ja9fpC8EV6MB"
         },
         {
           "name": "room",
@@ -1585,6 +1579,18 @@
           {
             "name": "crank_task",
             "type": "i64"
+          },
+          {
+            "name": "_pad",
+            "docs": [
+              "Pads the header so the world starts 8-byte aligned."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }

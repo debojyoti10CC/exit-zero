@@ -2,6 +2,7 @@
 
 use crate::consts::*;
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Item {
     pub kind: u8,
@@ -22,6 +23,7 @@ impl Item {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Player {
     pub state: u8,
@@ -75,6 +77,7 @@ impl Player {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Monster {
     pub kind: u8,
@@ -104,6 +107,7 @@ impl Monster {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Projectile {
     pub kind: u8,
@@ -116,6 +120,7 @@ pub struct Projectile {
     pub ttl: u8,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Chest {
     pub tx: u8,
@@ -126,6 +131,7 @@ pub struct Chest {
     pub req_tick: u32,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Drop {
     pub item: Item,
@@ -136,12 +142,14 @@ pub struct Drop {
     pub from: u8,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Portal {
     pub tx: u8,
     pub ty: u8,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Room {
     pub x: u8,
@@ -163,6 +171,7 @@ impl Room {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Door {
     pub tx: u8,
@@ -172,6 +181,7 @@ pub struct Door {
     pub open: u8,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Event {
     pub tick: u32,
@@ -183,6 +193,7 @@ pub struct Event {
     pub y: i32,
 }
 
+#[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct World {
     pub version: u8,
@@ -384,5 +395,52 @@ impl World {
     pub fn entrance(&self) -> (i32, i32) {
         let r = self.rooms[0];
         (r.cx(), r.cy())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Zero-copy access. On-chain, the World lives directly in the account data
+// (`#[repr(C)]`, little-endian, 8-byte aligned) and is edited in place, so no
+// instruction pays to decode or encode it. Every field is a plain integer, so
+// any byte pattern is a valid World.
+// ---------------------------------------------------------------------------
+
+/// Bytes a World occupies in account data.
+pub const WORLD_RAW_SIZE: usize = core::mem::size_of::<World>();
+pub const WORLD_ALIGN: usize = core::mem::align_of::<World>();
+
+impl World {
+    /// Views raw account bytes as a World. Returns None if too short or misaligned.
+    pub fn from_raw_mut(bytes: &mut [u8]) -> Option<&mut World> {
+        if bytes.len() < WORLD_RAW_SIZE || (bytes.as_ptr() as usize) % WORLD_ALIGN != 0 {
+            return None;
+        }
+        // SAFETY: length and alignment checked; World is repr(C) of integers only,
+        // so every bit pattern is valid and there are no invariants to uphold.
+        Some(unsafe { &mut *(bytes.as_mut_ptr() as *mut World) })
+    }
+
+    /// Copies raw bytes (any alignment) into a heap World.
+    pub fn from_raw_copy(bytes: &[u8]) -> Option<alloc::boxed::Box<World>> {
+        if bytes.len() < WORLD_RAW_SIZE {
+            return None;
+        }
+        let mut w = World::new_boxed();
+        // SAFETY: same reasoning as above; we write exactly WORLD_RAW_SIZE bytes.
+        unsafe {
+            core::ptr::copy_nonoverlapping(bytes.as_ptr(), (&mut *w as *mut World) as *mut u8, WORLD_RAW_SIZE);
+        }
+        Some(w)
+    }
+
+    /// Writes this World's raw representation into `out`.
+    pub fn write_raw(&self, out: &mut [u8]) -> bool {
+        if out.len() < WORLD_RAW_SIZE {
+            return false;
+        }
+        // SAFETY: World is plain old data; we read exactly its size.
+        let src = unsafe { core::slice::from_raw_parts((self as *const World) as *const u8, WORLD_RAW_SIZE) };
+        out[..WORLD_RAW_SIZE].copy_from_slice(src);
+        true
     }
 }
