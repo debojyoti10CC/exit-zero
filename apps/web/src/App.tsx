@@ -10,7 +10,7 @@ import { awardRun, type RunAward } from "./game/progress";
 import type { ContractResult } from "./game/contracts";
 import { Sprite, ItemIcon, HERO_SPRITES } from "./ui/Sprites";
 import { Hud } from "./ui/Hud";
-import { createGame } from "./game/GameScene";
+import { createGame } from "./game/Game3D";
 import { PracticeSession, loadWasm, type GameSession } from "./game/session";
 import { hud } from "./game/hudStore";
 import { sfx } from "./game/audio";
@@ -479,14 +479,14 @@ function GameView({ session, onExit, member, onAgain }: { session: GameSession; 
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    const game: Phaser.Game = createGame(host.current!, session, {
+    const game = createGame(host.current!, session, {
       onEnd: (w, me) => {
         const contracts = hud.get().contracts;
         setResult({ w, me, award: awardRun(w, me, contracts), contracts, death: hud.get().death });
       },
       onPauseToggle: () => setPaused((p) => !p),
     });
-    return () => game.destroy(true);
+    return () => game.destroy();
   }, [session]);
 
   useEffect(() => {
