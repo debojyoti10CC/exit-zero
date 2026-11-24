@@ -66,6 +66,21 @@ export function App() {
 
   useEffect(() => LS.set("exitzero.name", name), [name]);
   useEffect(() => LS.set("exitzero.class", String(cls)), [cls]);
+  // Night-town theme on the menus; browsers only allow audio after a gesture.
+  useEffect(() => {
+    if (screen === "game") {
+      sfx.stopMenuMusic();
+      return;
+    }
+    if (sfx.menu) return;
+    const start = () => sfx.startMenuMusic();
+    window.addEventListener("pointerdown", start, { once: true });
+    window.addEventListener("keydown", start, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", start);
+      window.removeEventListener("keydown", start);
+    };
+  }, [screen]);
   useEffect(() => {
     loadWasm();
   }, []);

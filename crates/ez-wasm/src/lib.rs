@@ -165,6 +165,72 @@ impl Sim {
         vec![nx, ny]
     }
 
+    // ---- Trailer staging helpers (used only by the trailer renderer) ----
+
+    /// Teleports a player (and resets its movement budget).
+    pub fn t_place(&mut self, p: u8, x: i32, y: i32) {
+        let t = self.w.tick;
+        if let Some(pl) = self.w.players.get_mut(p as usize) {
+            pl.x = x;
+            pl.y = y;
+            pl.last_move_tick = t * 16 + 16;
+        }
+    }
+
+    pub fn t_hp(&mut self, p: u8, hp: u16, max: u16) {
+        if let Some(pl) = self.w.players.get_mut(p as usize) {
+            pl.max_hp = max;
+            pl.hp = hp.min(max);
+        }
+    }
+
+    pub fn t_set_tick(&mut self, t: u32) {
+        self.w.tick = t;
+    }
+
+    /// Removes every monster within `r` units of (x, y) (r < 0 removes all).
+    pub fn t_clear_monsters(&mut self, x: i32, y: i32, r: i32) {
+        let r2 = r as i64 * r as i64;
+        for m in self.w.monsters.iter_mut() {
+            if m.kind == MON_NONE || m.kind == MON_KING {
+                continue;
+            }
+            if r < 0 || ez_core::math::dist2(m.x, m.y, x, y) <= r2 {
+                *m = Monster::default();
+            }
+        }
+    }
+
+    /// Spawns a monster; returns its slot or -1.
+    pub fn t_spawn(&mut self, kind: u8, x: i32, y: i32, chase: bool, target: u8) -> i32 {
+        match ez_core::map::spawn_monster_pub(&mut self.w, kind, x, y, 0, false) {
+            Some(s) => {
+                if chase {
+                    self.w.monsters[s].state = ez_core::world::MS_CHASE;
+                    self.w.monsters[s].target = target;
+                }
+                s as i32
+            }
+            None => -1,
+        }
+    }
+
+    /// Places an item on the floor with the usual loot fanfare.
+    pub fn t_drop(&mut self, kind: u8, rarity: u8, x: i32, y: i32) {
+        if let Some(slot) = self.w.drops.iter().position(|d| d.item.is_empty()) {
+            self.w.drops[slot] = Drop { item: Item { kind, rarity }, x, y, spawn_tick: self.w.tick, from: NOBODY };
+            self.w.push_event(EV_LOOT, 0, kind, rarity, x, y);
+        }
+    }
+
+    /// Moves a monster (e.g. to frame the boss).
+    pub fn t_move_monster(&mut self, mi: u8, x: i32, y: i32) {
+        if let Some(m) = self.w.monsters.get_mut(mi as usize) {
+            m.x = x;
+            m.y = y;
+        }
+    }
+
     pub fn tick_count(&self) -> u32 {
         self.w.tick
     }

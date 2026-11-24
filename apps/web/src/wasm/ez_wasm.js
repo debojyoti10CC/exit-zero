@@ -180,6 +180,12 @@ export class Sim {
         wasm.sim_act_combat(this.__wbg_ptr, p, kind, aim);
     }
     /**
+     * @param {number} t
+     */
+    t_set_tick(t) {
+        wasm.sim_t_set_tick(this.__wbg_ptr, t);
+    }
+    /**
      * @returns {number}
      */
     tick_count() {
@@ -215,6 +221,24 @@ export class Sim {
         return ret !== 0;
     }
     /**
+     * Moves a monster (e.g. to frame the boss).
+     * @param {number} mi
+     * @param {number} x
+     * @param {number} y
+     */
+    t_move_monster(mi, x, y) {
+        wasm.sim_t_move_monster(this.__wbg_ptr, mi, x, y);
+    }
+    /**
+     * Removes every monster within `r` units of (x, y) (r < 0 removes all).
+     * @param {number} x
+     * @param {number} y
+     * @param {number} r
+     */
+    t_clear_monsters(x, y, r) {
+        wasm.sim_t_clear_monsters(this.__wbg_ptr, x, y, r);
+    }
+    /**
      * Wraps world bytes read from the rollup (for prediction and decoding helpers).
      * @param {Uint8Array} bytes
      * @returns {Sim}
@@ -227,6 +251,14 @@ export class Sim {
             throw takeFromExternrefTable0(ret[1]);
         }
         return Sim.__wrap(ret[0]);
+    }
+    /**
+     * @param {number} p
+     * @param {number} hp
+     * @param {number} max
+     */
+    t_hp(p, hp, max) {
+        wasm.sim_t_hp(this.__wbg_ptr, p, hp, max);
     }
     /**
      * Advances one world tick, letting bots act first. Returns chest indices bots opened.
@@ -277,6 +309,16 @@ export class Sim {
         return ret !== 0;
     }
     /**
+     * Places an item on the floor with the usual loot fanfare.
+     * @param {number} kind
+     * @param {number} rarity
+     * @param {number} x
+     * @param {number} y
+     */
+    t_drop(kind, rarity, x, y) {
+        wasm.sim_t_drop(this.__wbg_ptr, kind, rarity, x, y);
+    }
+    /**
      * @param {Uint8Array} bytes
      * @returns {boolean}
      */
@@ -285,6 +327,28 @@ export class Sim {
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.sim_replace(this.__wbg_ptr, ptr0, len0);
         return ret !== 0;
+    }
+    /**
+     * Teleports a player (and resets its movement budget).
+     * @param {number} p
+     * @param {number} x
+     * @param {number} y
+     */
+    t_place(p, x, y) {
+        wasm.sim_t_place(this.__wbg_ptr, p, x, y);
+    }
+    /**
+     * Spawns a monster; returns its slot or -1.
+     * @param {number} kind
+     * @param {number} x
+     * @param {number} y
+     * @param {boolean} chase
+     * @param {number} target
+     * @returns {number}
+     */
+    t_spawn(kind, x, y, chase, target) {
+        const ret = wasm.sim_t_spawn(this.__wbg_ptr, kind, x, y, chase, target);
+        return ret;
     }
     /**
      * @param {number} p

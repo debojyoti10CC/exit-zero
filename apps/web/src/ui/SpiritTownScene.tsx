@@ -28,7 +28,44 @@ export function SpiritTownScene({ focus = -1, dim = 0, heroes = true }: ScenePro
 
   useEffect(() => {
     const c = ref.current!;
-    const ctx = c.getContext("2d")!;
+    const town = makeTown(c.getContext("2d")!);
+    let raf = 0;
+    let last = 0;
+    const t0 = performance.now();
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      if (now - last < 33) return;
+      last = now;
+      const { focus: fo, heroes: show, dim: dm } = props.current;
+      town.draw((now - t0) / 1000, fo, show, dm);
+    };
+    raf = requestAnimationFrame(loop);
+    const fit = () => {
+      const s = Math.max(1, Math.ceil(Math.max(window.innerWidth / W, window.innerHeight / H)));
+      c.style.width = `${W * s}px`;
+      c.style.height = `${H * s}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
+
+  return (
+    <div className="crypt-bg">
+      <canvas ref={ref} width={W} height={H} />
+    </div>
+  );
+}
+
+export const TOWN_W = W;
+export const TOWN_H = H;
+
+/** Builds the night-town renderer for a 480x270 context; draw(t) renders the scene at time t (seconds). */
+export function makeTown(ctx: CanvasRenderingContext2D) {
+  {
     ctx.imageSmoothingEnabled = false;
 
     // ---- static layer -----------------------------------------------------
@@ -162,14 +199,7 @@ export function SpiritTownScene({ focus = -1, dim = 0, heroes = true }: ScenePro
     dark.height = H;
     const dx = dark.getContext("2d")!;
 
-    let raf = 0;
-    let last = 0;
-    const t0 = performance.now();
-    const frame = (now: number) => {
-      raf = requestAnimationFrame(frame);
-      if (now - last < 33) return;
-      last = now;
-      const t = (now - t0) / 1000;
+    const draw = (t: number, fo = -1, show = true, dm = 0) => {
       ctx.drawImage(stat, 0, 0);
       for (const s of stars) {
         if (Math.hypot(s.x - MX, s.y - MY) < MR + 30) continue;
@@ -192,7 +222,6 @@ export function SpiritTownScene({ focus = -1, dim = 0, heroes = true }: ScenePro
       ctx.drawImage(hollowFrames(2)[f2], 60, GROUND + 22);
 
       // Reapers on the path, drawn at 2x.
-      const { focus: fo, heroes: show, dim: dm } = props.current;
       if (show || fo >= 0) {
         const party = [
           { cls: 0, x: MX - 52, y: GROUND + 60, flip: false },
@@ -283,24 +312,6 @@ export function SpiritTownScene({ focus = -1, dim = 0, heroes = true }: ScenePro
         ctx.fillRect(0, 0, W, H);
       }
     };
-    raf = requestAnimationFrame(frame);
-
-    const fit = () => {
-      const s = Math.max(1, Math.ceil(Math.max(window.innerWidth / W, window.innerHeight / H)));
-      c.style.width = `${W * s}px`;
-      c.style.height = `${H * s}px`;
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", fit);
-    };
-  }, []);
-
-  return (
-    <div className="crypt-bg">
-      <canvas ref={ref} width={W} height={H} />
-    </div>
-  );
+    return { draw };
+  }
 }

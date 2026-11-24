@@ -31,7 +31,10 @@ function Root() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+if (new URLSearchParams(location.search).has("trailer")) {
+  // Trailer renderer (see src/trailer/director.ts and scripts/render-trailer.mjs).
+  import("./trailer/director").then((m) => m.bootTrailer());
+} else ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Root />
   </React.StrictMode>,

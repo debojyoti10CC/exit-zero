@@ -19,14 +19,24 @@ export class Sim {
    * kind: 0 attack, 1 special, 2 dodge, 3 potion
    */
   act_combat(p: number, kind: number, aim: number): void;
+  t_set_tick(t: number): void;
   tick_count(): number;
   static world_size(): number;
   replace_raw(raw: Uint8Array): boolean;
   resolve_chest(chest: number, rnd: Uint8Array): boolean;
   /**
+   * Moves a monster (e.g. to frame the boss).
+   */
+  t_move_monster(mi: number, x: number, y: number): void;
+  /**
+   * Removes every monster within `r` units of (x, y) (r < 0 removes all).
+   */
+  t_clear_monsters(x: number, y: number, r: number): void;
+  /**
    * Wraps world bytes read from the rollup (for prediction and decoding helpers).
    */
   static load(bytes: Uint8Array): Sim;
+  t_hp(p: number, hp: number, max: number): void;
   /**
    * Advances one world tick, letting bots act first. Returns chest indices bots opened.
    */
@@ -38,7 +48,19 @@ export class Sim {
    */
   slide(x: number, y: number, dx: number, dy: number): Int32Array;
   is_bot(p: number): boolean;
+  /**
+   * Places an item on the floor with the usual loot fanfare.
+   */
+  t_drop(kind: number, rarity: number, x: number, y: number): void;
   replace(bytes: Uint8Array): boolean;
+  /**
+   * Teleports a player (and resets its movement budget).
+   */
+  t_place(p: number, x: number, y: number): void;
+  /**
+   * Spawns a monster; returns its slot or -1.
+   */
+  t_spawn(kind: number, x: number, y: number, chase: boolean, target: number): number;
   act_move(p: number, x: number, y: number, aim: number, moving: number): void;
   /**
    * Returns the chest index waiting for randomness, or -1.
@@ -78,6 +100,13 @@ export interface InitOutput {
   readonly sim_replace_raw: (a: number, b: number, c: number) => number;
   readonly sim_resolve_chest: (a: number, b: number, c: number, d: number) => number;
   readonly sim_slide: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+  readonly sim_t_clear_monsters: (a: number, b: number, c: number, d: number) => void;
+  readonly sim_t_drop: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly sim_t_hp: (a: number, b: number, c: number, d: number) => void;
+  readonly sim_t_move_monster: (a: number, b: number, c: number, d: number) => void;
+  readonly sim_t_place: (a: number, b: number, c: number, d: number) => void;
+  readonly sim_t_set_tick: (a: number, b: number) => void;
+  readonly sim_t_spawn: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
   readonly sim_tick: (a: number) => [number, number];
   readonly sim_tick_count: (a: number) => number;
   readonly sim_tick_only: (a: number) => void;

@@ -186,6 +186,116 @@ class Sfx {
     this.setHum(0);
   }
 
+  // ---- Menu music: night-town theme (koto ostinato, soft taiko, dark pad) ----
+  menu: { stop: () => void } | null = null;
+
+  private pluckAt(t: number, freq: number, vol: number, out: AudioNode) {
+    const ctx = this.ctx!;
+    for (const det of [0, 5]) {
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.value = freq;
+      o.detune.value = det;
+      const f = ctx.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.setValueAtTime(5200, t);
+      f.frequency.exponentialRampToValueAtTime(800, t + 0.3);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.connect(f).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 1);
+    }
+  }
+
+  private drumAt(t: number, vol: number, out: AudioNode) {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.3);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.75);
+  }
+
+  /** Starts the looping night-town theme (call after a user gesture). */
+  startMenuMusic() {
+    const ctx = this.ensure();
+    if (this.menu) return;
+    const out = ctx.createGain();
+    out.gain.value = 0.0001;
+    out.gain.exponentialRampToValueAtTime(0.9, ctx.currentTime + 2.5);
+    out.connect(this.music);
+    // Echo gives the plucks a temple-hall tail.
+    const echo = ctx.createDelay(1);
+    echo.delayTime.value = 0.32;
+    const fb = ctx.createGain();
+    fb.gain.value = 0.32;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.35;
+    echo.connect(fb).connect(echo);
+    echo.connect(wet).connect(out);
+    const pluckBus = ctx.createGain();
+    pluckBus.connect(out);
+    pluckBus.connect(echo);
+    // Pad
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 420;
+    const padG = ctx.createGain();
+    padG.gain.value = 0.05;
+    lp.connect(padG).connect(out);
+    const pads = [55, 82.4, 110, 130.8].map((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.detune.value = [0, -6, 5, 3][i];
+      o.connect(lp);
+      o.start();
+      return o;
+    });
+    // A Bb D E F — the in scale, two octaves.
+    const scale = [220, 233.1, 293.7, 329.6, 349.2, 440, 466.2, 587.3, 659.3];
+    const phrase = [0, -1, 2, -1, 3, 2, -1, 1, 0, -1, 3, -1, 5, 4, -1, 3, 2, -1, 4, -1, 6, 5, -1, 4, 3, 2, -1, 1, 0, -1, -1, -1];
+    const step = 60 / 96 / 2;
+    let next = ctx.currentTime + 0.15;
+    let i = 0;
+    const timer = window.setInterval(() => {
+      while (next < ctx.currentTime + 0.35) {
+        const s = i % phrase.length;
+        const bar = Math.floor(i / phrase.length) % 4;
+        const n = phrase[s];
+        if (n >= 0) this.pluckAt(next, scale[Math.min(scale.length - 1, n + (bar === 3 ? 2 : 0))], 0.07, pluckBus);
+        if (s % 8 === 0) this.drumAt(next, bar === 3 && s === 24 ? 0.5 : 0.32, out);
+        if (s === 6 || s === 22) this.drumAt(next, 0.18, out);
+        next += step;
+        i++;
+      }
+    }, 50);
+    this.menu = {
+      stop: () => {
+        clearInterval(timer);
+        const t = ctx.currentTime;
+        out.gain.cancelScheduledValues(t);
+        out.gain.setValueAtTime(out.gain.value, t);
+        out.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+        pads.forEach((o) => o.stop(t + 0.9));
+      },
+    };
+  }
+
+  stopMenuMusic() {
+    this.menu?.stop();
+    this.menu = null;
+  }
+
   /** Portal hum, volume by proximity (0..1). */
   setHum(level: number) {
     const ctx = this.ctx;
