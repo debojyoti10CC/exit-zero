@@ -1207,9 +1207,9 @@ export class GameScene extends Phaser.Scene {
       }
       // label
       const cam = this.cameras.main;
-      const sx = (X - cam.worldView.x) * ZOOM;
-      const sy = (Y - cam.worldView.y) * ZOOM;
-      v.label.setPosition(sx, sy - 22 * ZOOM / 1.4).setVisible(p.state === PS.ALIVE && this.isLit(X, Y));
+      const sx = (X - cam.worldView.x) * cam.zoom;
+      const sy = (Y - cam.worldView.y) * cam.zoom;
+      v.label.setPosition(sx, sy - 22 * cam.zoom / 1.4).setVisible(p.state === PS.ALIVE && this.isLit(X, Y));
     }
   }
 
@@ -1595,7 +1595,7 @@ export class GameScene extends Phaser.Scene {
   renderUi(B: World, time: number) {
     const cam = this.cameras.main;
     const view = cam.worldView;
-    const toS = (x: number, y: number): [number, number] => [(x - view.x) * ZOOM, (y - view.y) * ZOOM];
+    const toS = (x: number, y: number): [number, number] => [(x - view.x) * cam.zoom, (y - view.y) * cam.zoom];
     const g = this.uiG;
     g.clear();
     // Monster HP bars

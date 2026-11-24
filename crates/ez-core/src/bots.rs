@@ -66,7 +66,7 @@ pub fn think(w: &World, p: u8, mem: &mut BotMemory, rng: &mut Rng) -> Vec<Action
         return out;
     }
     let st = &CLASSES[me.class as usize];
-    if me.hp * 100 < me.max_hp * 40 && me.potions > 0 {
+    if (me.hp as u32) * 100 < (me.max_hp as u32) * 40 && me.potions > 0 {
         out.push(Action::Potion);
     }
 
@@ -84,7 +84,7 @@ pub fn think(w: &World, p: u8, mem: &mut BotMemory, rng: &mut Rng) -> Vec<Action
 
     // 1. Escape when rich, hurt or late.
     let late = w.tick + 400 > w.collapse_tick;
-    if w.portals_open() && (loot >= mem.greed || me.hp * 100 < me.max_hp * 35 || late || w.tick > w.portal_tick + 700) {
+    if w.portals_open() && (loot >= mem.greed || (me.hp as u32) * 100 < (me.max_hp as u32) * 35 || late || w.tick > w.portal_tick + 700) {
         let mut best = i64::MAX;
         for po in w.portals.iter().filter(|po| po.tx != 0 || po.ty != 0) {
             let (x, y) = (po.tx as i32 * TILE + TILE / 2, po.ty as i32 * TILE + TILE / 2);
@@ -103,7 +103,7 @@ pub fn think(w: &World, p: u8, mem: &mut BotMemory, rng: &mut Rng) -> Vec<Action
                 continue;
             }
             let d = dist(me.x, me.y, q.x, q.y);
-            if d < TILE * 4 && q.loot_value() > 80 && q.hp * 100 < q.max_hp * 45 && me.hp > q.hp {
+            if d < TILE * 4 && q.loot_value() > 80 && (q.hp as u32) * 100 < (q.max_hp as u32) * 45 && me.hp > q.hp {
                 fight = Some((q.x, q.y));
             }
         }
@@ -117,7 +117,7 @@ pub fn think(w: &World, p: u8, mem: &mut BotMemory, rng: &mut Rng) -> Vec<Action
             let reach = if goal.is_some() { TILE * 2 } else { TILE * 6 };
             if d < (reach as i64).pow(2) && d < best && crate::sim::line_clear(w, me.x, me.y, m.x, m.y) {
                 // Avoid the boss unless healthy.
-                if m.kind == MON_KING && me.hp * 100 < me.max_hp * 60 {
+                if m.kind == MON_KING && (me.hp as u32) * 100 < (me.max_hp as u32) * 60 {
                     continue;
                 }
                 best = d;
