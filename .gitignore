@@ -9,3 +9,6 @@ id.json
 .env.local
 .DS_Store
 .claude/settings.local.json
+trailer/frames/
+trailer/*.wav
+trailer/*.mp4
