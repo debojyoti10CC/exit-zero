@@ -38,6 +38,23 @@ pub const MAX_SESSION_SECS: i64 = 4 * 60 * 60;
 /// Rollup slots (~50ms each) of inactivity before a stuck room may be recycled.
 pub const RECYCLE_SLOTS: u64 = 1200;
 
+// --- Relic NFTs (Metaplex Core) -------------------------------------------
+/// System-owned PDA that pays rent for every relic mint and is the update
+/// authority of the relic collection. Funded by the deployer.
+pub const SPONSOR_SEED: &[u8] = b"sponsor";
+/// The Metaplex Core collection every relic NFT belongs to (a PDA, so only this
+/// program can add assets to it).
+pub const COLLECTION_SEED: &[u8] = b"relics";
+/// Each relic's NFT address is a PDA of its vault slot, so it can be minted once.
+pub const RELIC_SEED: &[u8] = b"relic";
+pub const MPL_CORE: Pubkey = pubkey!("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
+pub const DELEGATION_PROGRAM: Pubkey = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+pub const RELIC_META_BASE: &str = "https://exitzero.djyo.tech/relics/";
+pub const ITEM_NAMES: [&str; 11] = [
+    "", "Grave Coins", "Soul Gem", "Chalice", "Hollow Idol", "Crown", "Relic Blade", "Aegis", "Potion", "Vault Key", "Heart of the Hollow",
+];
+pub const RARITY_NAMES: [&str; 5] = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
+
 #[ephemeral]
 #[program]
 pub mod exit_zero {
@@ -422,6 +439,126 @@ pub mod exit_zero {
         Ok(())
     }
 
+    // ------------------------------------------------------------------
+    // Relic NFTs (base layer)
+    // ------------------------------------------------------------------
+
+    /// One-time setup: creates the Metaplex Core collection for relic NFTs,
+    /// with the sponsor PDA as its update authority.
+    pub fn create_relic_collection(ctx: Context<CreateRelicCollection>) -> Result<()> {
+        let mut data = vec![1u8]; // CreateCollectionV1
+        push_str(&mut data, "EXIT//ZERO Relics");
+        push_str(&mut data, &format!("{}collection.json", RELIC_META_BASE));
+        data.push(0); // plugins: None
+        let a = &ctx.accounts;
+        let ix = Instruction {
+            program_id: MPL_CORE,
+            accounts: vec![
+                AccountMeta::new(a.collection.key(), true),
+                AccountMeta::new_readonly(a.sponsor.key(), false),
+                AccountMeta::new(a.payer.key(), true),
+                AccountMeta::new_readonly(a.system_program.key(), false),
+            ],
+            data,
+        };
+        let bump = [ctx.bumps.collection];
+        anchor_lang::solana_program::program::invoke_signed(
+            &ix,
+            &[
+                a.collection.to_account_info(),
+                a.sponsor.to_account_info(),
+                a.payer.to_account_info(),
+                a.system_program.to_account_info(),
+                a.mpl_core.to_account_info(),
+            ],
+            &[&[COLLECTION_SEED, &bump]],
+        )?;
+        Ok(())
+    }
+
+    /// Mints a vault relic as a Metaplex Core NFT to its recorded owner.
+    /// Rent is paid by the sponsor PDA; anyone may submit it (the NFT always
+    /// goes to the owner in the Vault). The asset address is a PDA of the vault
+    /// slot, so each relic can be minted only once.
+    pub fn mint_relic(ctx: Context<MintRelic>, page: u8, index: u16) -> Result<()> {
+        let a = &ctx.accounts;
+        // The Vault is delegated to the rollup; its committed state is readable here.
+        let vinfo = a.vault.to_account_info();
+        require!(*vinfo.owner == crate::ID || *vinfo.owner == DELEGATION_PROGRAM, GameError::BadRelic);
+        let relic = {
+            let d = vinfo.try_borrow_data()?;
+            require!(d.len() >= 13 && d[..8] == *VaultPage::DISCRIMINATOR && d[8] == page, GameError::BadRelic);
+            let len = u32::from_le_bytes([d[9], d[10], d[11], d[12]]) as usize;
+            require!((index as usize) < len, GameError::BadRelic);
+            let off = 13 + index as usize * VaultPage::RELIC_SIZE;
+            require!(d.len() >= off + VaultPage::RELIC_SIZE, GameError::BadRelic);
+            Relic::try_from_slice(&d[off..off + VaultPage::RELIC_SIZE]).map_err(|_| error!(GameError::BadRelic))?
+        };
+        require_keys_eq!(relic.owner, a.owner.key(), GameError::NotOwner);
+        let kind = (relic.kind as usize).min(ITEM_NAMES.len() - 1);
+        let rarity = (relic.rarity as usize).min(RARITY_NAMES.len() - 1);
+        let serial = page as u32 * VAULT_PAGE_MAX as u32 + index as u32 + 1;
+
+        let mut data = vec![0u8, 0u8]; // CreateV1, DataState::AccountState
+        push_str(&mut data, &format!("{} {} #{}", RARITY_NAMES[rarity], ITEM_NAMES[kind], serial));
+        push_str(&mut data, &format!("{}{}-{}.json", RELIC_META_BASE, kind, rarity));
+        let mut seed_hex = String::with_capacity(16);
+        for b in relic.seed8 {
+            seed_hex.push_str(&format!("{:02x}", b));
+        }
+        let attrs: [(&str, String); 7] = [
+            ("Rarity", RARITY_NAMES[rarity].into()),
+            ("Item", ITEM_NAMES[kind].into()),
+            ("Value", format!("{}", relic.value)),
+            ("Crypt", format!("{}", relic.room as u32 + 1)),
+            ("Run", format!("{}", relic.nonce)),
+            ("VRF Seed", seed_hex),
+            ("Extracted", format!("{}", relic.ts)),
+        ];
+        // plugins: Some([Attributes { .. } with the default authority])
+        data.push(1);
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.push(6); // Plugin::Attributes
+        data.extend_from_slice(&(attrs.len() as u32).to_le_bytes());
+        for (k, v) in attrs.iter() {
+            push_str(&mut data, k);
+            push_str(&mut data, v);
+        }
+        data.push(0); // authority: None
+
+        let ix = Instruction {
+            program_id: MPL_CORE,
+            accounts: vec![
+                AccountMeta::new(a.asset.key(), true),
+                AccountMeta::new(a.collection.key(), false),
+                AccountMeta::new_readonly(a.sponsor.key(), true),
+                AccountMeta::new(a.sponsor.key(), true),
+                AccountMeta::new_readonly(a.owner.key(), false),
+                AccountMeta::new_readonly(MPL_CORE, false),
+                AccountMeta::new_readonly(a.system_program.key(), false),
+                AccountMeta::new_readonly(MPL_CORE, false),
+            ],
+            data,
+        };
+        let ib = index.to_le_bytes();
+        let pb = [page];
+        let asset_bump = [ctx.bumps.asset];
+        let sponsor_bump = [ctx.bumps.sponsor];
+        anchor_lang::solana_program::program::invoke_signed(
+            &ix,
+            &[
+                a.asset.to_account_info(),
+                a.collection.to_account_info(),
+                a.sponsor.to_account_info(),
+                a.owner.to_account_info(),
+                a.system_program.to_account_info(),
+                a.mpl_core.to_account_info(),
+            ],
+            &[&[RELIC_SEED, &pb, &ib, &asset_bump], &[SPONSOR_SEED, &sponsor_bump]],
+        )?;
+        Ok(())
+    }
+
     /// Commits the room to Solana mid-run (snapshots for verification) or
     /// commits and undelegates it (admin maintenance).
     pub fn commit_room(ctx: Context<CommitRoom>, undelegate: bool) -> Result<()> {
@@ -442,6 +579,11 @@ pub mod exit_zero {
 // ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
+
+fn push_str(out: &mut Vec<u8>, s: &str) {
+    out.extend_from_slice(&(s.len() as u32).to_le_bytes());
+    out.extend_from_slice(s.as_bytes());
+}
 
 /// Zero-copy view of the match world inside the room account.
 fn world_of(data: &mut [u8]) -> Result<&mut World> {
@@ -761,6 +903,45 @@ pub struct TransferRelic<'info> {
     pub owner: Signer<'info>,
     #[account(mut, seeds = [VAULT_SEED, &[vault.page]], bump)]
     pub vault: Account<'info, VaultPage>,
+}
+
+#[derive(Accounts)]
+pub struct CreateRelicCollection<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: created by Metaplex Core; address is our PDA.
+    #[account(mut, seeds = [COLLECTION_SEED], bump)]
+    pub collection: UncheckedAccount<'info>,
+    /// CHECK: system-owned PDA, the collection's update authority.
+    #[account(seeds = [SPONSOR_SEED], bump)]
+    pub sponsor: UncheckedAccount<'info>,
+    /// CHECK: Metaplex Core program.
+    #[account(address = MPL_CORE)]
+    pub mpl_core: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(page: u8, index: u16)]
+pub struct MintRelic<'info> {
+    /// CHECK: Vault page (delegated or not); parsed by hand, address checked by seeds.
+    #[account(seeds = [VAULT_SEED, &[page]], bump)]
+    pub vault: UncheckedAccount<'info>,
+    /// CHECK: the new Core asset, a PDA of the vault slot.
+    #[account(mut, seeds = [RELIC_SEED, &[page], &index.to_le_bytes()], bump)]
+    pub asset: UncheckedAccount<'info>,
+    /// CHECK: relic collection PDA.
+    #[account(mut, seeds = [COLLECTION_SEED], bump)]
+    pub collection: UncheckedAccount<'info>,
+    /// CHECK: system-owned PDA that pays rent and signs as collection authority.
+    #[account(mut, seeds = [SPONSOR_SEED], bump)]
+    pub sponsor: UncheckedAccount<'info>,
+    /// CHECK: must equal the relic's recorded owner.
+    pub owner: UncheckedAccount<'info>,
+    /// CHECK: Metaplex Core program.
+    #[account(address = MPL_CORE)]
+    pub mpl_core: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]

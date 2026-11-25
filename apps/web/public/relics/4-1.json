@@ -1,0 +1,26 @@
+{
+  "name": "Uncommon Hollow Idol",
+  "symbol": "XZRELIC",
+  "description": "An idol carved in the Hollow's own likeness. Carried out of an EXIT//ZERO crypt alive. Every relic records the MagicBlock VRF seed of the run that produced it.",
+  "image": "https://exitzero.djyo.tech/relics/4-1.png",
+  "external_url": "https://exitzero.djyo.tech/",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Uncommon"
+    },
+    {
+      "trait_type": "Item",
+      "value": "Hollow Idol"
+    }
+  ],
+  "properties": {
+    "category": "image",
+    "files": [
+      {
+        "uri": "https://exitzero.djyo.tech/relics/4-1.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Legendary Vault Key",
+  "symbol": "XZRELIC",
+  "description": "The key that opens the deepest vault. Carried out of an EXIT//ZERO crypt alive. Every relic records the MagicBlock VRF seed of the run that produced it.",
+  "image": "https://exitzero.djyo.tech/relics/9-4.png",
+  "external_url": "https://exitzero.djyo.tech/",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Item",
+      "value": "Vault Key"
+    }
+  ],
+  "properties": {
+    "category": "image",
+    "files": [
+      {
+        "uri": "https://exitzero.djyo.tech/relics/9-4.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}

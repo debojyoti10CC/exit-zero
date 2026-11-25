@@ -19,10 +19,11 @@ import {
 } from "./game/world";
 import {
   ChainSession, RoomWatcher, fetchRooms, fetchHall, fetchRelics, joinRoom, restoreSession, guestKeypair, keypairSigner, startMatch,
-  beginMatch, scheduleCrank, settleMatch, resetRoom, setClass as setClassTx, leaveRoom, type RoomInfo, type Signer,
+  beginMatch, scheduleCrank, settleMatch, resetRoom, setClass as setClassTx, leaveRoom, fetchRelicChainState, claimRelic, type RoomInfo, type Signer,
+  type RelicChainState,
 } from "./chain/online";
 import { erExplorer, accountExplorer, ER_RPC, PROGRAM_ID } from "./chain/config";
-import type { HallEntry, Relic } from "./chain/program";
+import { relicAssetPda, type HallEntry, type Relic } from "./chain/program";
 
 type Screen = "menu" | "hero" | "practice" | "online" | "lobby" | "game" | "hall" | "vault" | "howto";
 
@@ -182,7 +183,7 @@ export function App() {
         />
       )}
       {screen === "hall" && <Hall go={go} identity={identity} />}
-      {screen === "vault" && <Vault go={go} identity={identity} />}
+      {screen === "vault" && <Vault go={go} identity={identity} signer={signer} />}
       {screen === "howto" && <HowTo go={go} />}
     </>
   );
@@ -658,12 +659,39 @@ function Hall({ go, identity }: { go: (s: Screen) => void; identity: string }) {
   );
 }
 
-function Vault({ go, identity }: { go: (s: Screen) => void; identity: string }) {
+function Vault({ go, identity, signer }: { go: (s: Screen) => void; identity: string; signer: Signer }) {
   const [relics, setRelics] = useState<Relic[] | null>(null);
   const [all, setAll] = useState(false);
-  useEffect(() => {
-    fetchRelics().then(setRelics).catch(() => setRelics([]));
+  const [chain, setChain] = useState<RelicChainState | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<{ ok: boolean; text: string; asset?: string } | null>(null);
+  const refresh = useCallback(async () => {
+    const rs = await fetchRelics().catch(() => [] as Relic[]);
+    setRelics(rs);
+    setChain(await fetchRelicChainState(rs).catch(() => null));
   }, []);
+  useEffect(() => {
+    refresh();
+    // Settled relics reach Solana a few seconds after the rollup commit.
+    const t = setInterval(refresh, 8000);
+    return () => clearInterval(t);
+  }, [refresh]);
+  const claim = async (r: Relic) => {
+    const key = `${r.page}-${r.index}`;
+    sfx.click();
+    setBusy(key);
+    setNote(null);
+    try {
+      const [, asset] = await claimRelic(r, signer);
+      sfx.legendary();
+      setNote({ ok: true, text: `${RARITY_NAMES[r.rarity]} ${ITEM_NAMES[r.kind]} minted to your wallet.`, asset });
+      await refresh();
+    } catch (e: any) {
+      setNote({ ok: false, text: String(e?.message || e).slice(0, 180) });
+    } finally {
+      setBusy(null);
+    }
+  };
   const list = (relics || []).filter((r) => all || r.owner === identity).sort((a, b) => b.rarity - a.rarity || b.value - a.value);
   return (
     <div className="screen" style={{ paddingTop: 70 }}>
@@ -683,9 +711,19 @@ function Vault({ go, identity }: { go: (s: Screen) => void; identity: string }) 
           </button>
         </div>
         <p className="muted small">
-          Rare, Epic and Legendary items you carry out of the crypt become relics recorded on-chain under your wallet, with the VRF seed of the run that produced them. Relics are
-          transferable through the program.
+          Rare, Epic and Legendary items you carry out of the crypt become relics recorded on-chain under your wallet, with the VRF seed of the run that produced them. Claim
+          one to mint it as a Metaplex Core NFT in your wallet, free: the game sponsors the mint.
         </p>
+        {note && (
+          <div className={`claim-note ${note.ok ? "ok" : "err"}`}>
+            {note.text}{" "}
+            {note.asset && (
+              <a href={accountExplorer(note.asset)} target="_blank" rel="noreferrer">
+                View NFT ↗
+              </a>
+            )}
+          </div>
+        )}
         {!relics && <div className="loading">OPENING THE VAULT…</div>}
         {relics && list.length === 0 && <div className="muted">{all ? "No relics have been extracted yet." : "You own no relics yet. Extract a Rare or better item."}</div>}
         <div className="items" style={{ marginTop: 10 }}>
@@ -702,12 +740,31 @@ function Vault({ go, identity }: { go: (s: Screen) => void; identity: string }) 
                 <div className="mono" style={{ fontSize: 9, color: "#6f6480" }}>
                   seed {r.seed8}… · owner {r.owner.slice(0, 4)}…{r.owner.slice(-4)}
                 </div>
+                <RelicClaim r={r} chain={chain} mine={r.owner === identity} busy={busy} onClaim={claim} />
               </div>
             </div>
           ))}
         </div>
       </div>
     </div>
+  );
+}
+
+function RelicClaim({ r, chain, mine, busy, onClaim }: { r: Relic; chain: RelicChainState | null; mine: boolean; busy: string | null; onClaim: (r: Relic) => void }) {
+  const key = `${r.page}-${r.index}`;
+  if (!chain) return null;
+  if (chain.minted.has(key))
+    return (
+      <a className="nft-tag" href={accountExplorer(relicAssetPda(r.page, r.index).toBase58())} target="_blank" rel="noreferrer">
+        ◆ NFT ON SOLANA ↗
+      </a>
+    );
+  if (!mine) return null;
+  if (!chain.synced.has(key)) return <div className="muted small">Syncing to Solana…</div>;
+  return (
+    <button className="btn small primary" style={{ marginTop: 6 }} disabled={busy !== null} onClick={() => onClaim(r)}>
+      {busy === key ? "Minting…" : "Claim NFT"}
+    </button>
   );
 }
 
@@ -780,6 +837,7 @@ function HowTo({ go }: { go: (s: Screen) => void }) {
               <li>Your wallet signs once; a session key signs every move.</li>
               <li>The world tick runs on a MagicBlock crank — no game server.</li>
               <li>Results and relics are committed back to Solana.</li>
+              <li>Claim any relic in the Relic Vault to mint it as a Metaplex Core NFT. The game sponsors the mint.</li>
             </ul>
           </div>
         </div>

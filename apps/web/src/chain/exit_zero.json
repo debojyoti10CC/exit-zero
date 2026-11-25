@@ -204,6 +204,77 @@
       "args": []
     },
     {
+      "name": "create_relic_collection",
+      "docs": [
+        "One-time setup: creates the Metaplex Core collection for relic NFTs,",
+        "with the sponsor PDA as its update authority."
+      ],
+      "discriminator": [
+        177,
+        38,
+        18,
+        67,
+        104,
+        248,
+        192,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collection",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sponsor",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_room",
       "discriminator": [
         130,
@@ -946,6 +1017,94 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "mint_relic",
+      "docs": [
+        "Mints a vault relic as a Metaplex Core NFT to its recorded owner.",
+        "Rent is paid by the sponsor PDA; anyone may submit it (the NFT always",
+        "goes to the owner in the Vault). The asset address is a PDA of the vault",
+        "slot, so each relic can be minted only once."
+      ],
+      "discriminator": [
+        113,
+        221,
+        242,
+        189,
+        203,
+        132,
+        67,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "vault"
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "collection",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sponsor",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner"
+        },
+        {
+          "name": "mpl_core",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "page",
+          "type": "u8"
+        },
+        {
+          "name": "index",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "move_to",

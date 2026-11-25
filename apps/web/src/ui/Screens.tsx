@@ -424,7 +424,7 @@ export function ResultsScroll({
             </div>
             {extracted && session.mode === "online" && p.inv.some((i) => i.kind && i.rarity >= 2) && (
               <div className="small violet" style={{ marginTop: 6 }}>
-                ◆ Rare and better items are recorded as relics under your wallet.
+                ◆ Rare and better items are recorded as relics under your wallet. Claim them as free NFTs in the Relic Vault.
               </div>
             )}
           </div>

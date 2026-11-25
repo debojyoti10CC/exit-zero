@@ -213,3 +213,16 @@ export function decodeVault(data: Uint8Array): { page: number; relics: Relic[] }
   }
   return { page, relics };
 }
+
+// --- relic NFTs (Metaplex Core, base layer) ---------------------------------
+export const MPL_CORE = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
+export const sponsorPda = () => PublicKey.findProgramAddressSync([enc.encode("sponsor")], PROGRAM_ID)[0];
+export const relicCollectionPda = () => PublicKey.findProgramAddressSync([enc.encode("relics")], PROGRAM_ID)[0];
+export const relicAssetPda = (page: number, index: number) =>
+  PublicKey.findProgramAddressSync([enc.encode("relic"), Uint8Array.of(page), Uint8Array.of(index & 255, index >> 8)], PROGRAM_ID)[0];
+/** Mints vault relic (page, index) as a Core NFT to `owner`; rent comes from the sponsor PDA. */
+export const ixMintRelic = (page: number, index: number, owner: PublicKey) =>
+  ix(
+    [r(vaultPda(page)), w(relicAssetPda(page, index)), w(relicCollectionPda()), w(sponsorPda()), r(owner), r(MPL_CORE), r(SystemProgram.programId)],
+    new Buf().u8(page).u16(index).done("mint_relic"),
+  );
