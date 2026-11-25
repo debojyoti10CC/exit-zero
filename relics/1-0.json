@@ -1,0 +1,26 @@
+{
+  "name": "Common Grave Coins",
+  "symbol": "XZRELIC",
+  "description": "Coins pressed for the dead, still cold from the grave. Carried out of an EXIT//ZERO crypt alive. Every relic records the MagicBlock VRF seed of the run that produced it.",
+  "image": "https://exitzero.djyo.tech/relics/1-0.png",
+  "external_url": "https://exitzero.djyo.tech/",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    },
+    {
+      "trait_type": "Item",
+      "value": "Grave Coins"
+    }
+  ],
+  "properties": {
+    "category": "image",
+    "files": [
+      {
+        "uri": "https://exitzero.djyo.tech/relics/1-0.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}

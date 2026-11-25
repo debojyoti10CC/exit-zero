@@ -1,0 +1,26 @@
+{
+  "name": "Uncommon Heart of the Hollow",
+  "symbol": "XZRELIC",
+  "description": "The beating heart of the Hollow King. Carried out of an EXIT//ZERO crypt alive. Every relic records the MagicBlock VRF seed of the run that produced it.",
+  "image": "https://exitzero.djyo.tech/relics/10-1.png",
+  "external_url": "https://exitzero.djyo.tech/",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Uncommon"
+    },
+    {
+      "trait_type": "Item",
+      "value": "Heart of the Hollow"
+    }
+  ],
+  "properties": {
+    "category": "image",
+    "files": [
+      {
+        "uri": "https://exitzero.djyo.tech/relics/10-1.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}

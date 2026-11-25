@@ -1,0 +1,26 @@
+{
+  "name": "Legendary Soul Gem",
+  "symbol": "XZRELIC",
+  "description": "A gem that hums with a trapped soul. Carried out of an EXIT//ZERO crypt alive. Every relic records the MagicBlock VRF seed of the run that produced it.",
+  "image": "https://exitzero.djyo.tech/relics/2-4.png",
+  "external_url": "https://exitzero.djyo.tech/",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Item",
+      "value": "Soul Gem"
+    }
+  ],
+  "properties": {
+    "category": "image",
+    "files": [
+      {
+        "uri": "https://exitzero.djyo.tech/relics/2-4.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}
