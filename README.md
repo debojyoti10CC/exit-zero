@@ -25,6 +25,7 @@ Measured on devnet: world tick ~26k CU (crank-driven, ~10/s), move ~15k CU, atta
 | **Determinism** | The dungeon is generated on-chain from the verified seed by `ez-core`. The same crate compiles to WASM, so anyone can re-derive the exact layout. |
 | **Settlement** | `settle` writes results to the delegated **Hall** (leaderboard) and **Vault** (relic ownership ledger), then commits all three accounts back to Solana. |
 | **Relics** | Rare, Epic and Legendary items you extract become relic records owned by your wallet (with the run's seed). `transfer_relic` moves them. |
+| **Relic NFTs** | `mint_relic` turns a vault relic into a **Metaplex Core** NFT in the *EXIT//ZERO Relics* collection, owned by the relic's owner, with rarity, run, crypt and VRF seed as on-chain attributes. The collection and every asset address are program PDAs (one mint per relic, no outside mints), and a sponsor PDA pays the rent, so claiming is free for players. |
 
 ## Repository layout
 
@@ -67,6 +68,7 @@ bash scripts/wsl-sync.sh             # mirror sources into WSL
 bash scripts/wsl-build.sh all        # program + IDL + WASM (copied into apps/web/src)
 bash scripts/wsl-deploy.sh           # needs ~9 devnet SOL in ~/.config/solana/id.json
 cd apps/web && node scripts/setup-devnet.mjs   # create + delegate rooms, Hall, Vault
+node scripts/setup-relics.mjs                  # fund the mint sponsor, create the relic collection + fee relayer
 ```
 
 Core tests: `cargo test -p ez-core --release` (300 seeds checked for connectivity, speed-hack

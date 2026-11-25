@@ -124,6 +124,68 @@ export async function fetchRelics() {
   return out;
 }
 
+// --- relic NFTs -------------------------------------------------------------
+/** Devnet fee relayer (VITE_RELAYER_KEY, injected at build) so guests with 0 SOL can claim. */
+const RELAYER: Keypair | null = (() => {
+  try {
+    const k = import.meta.env.VITE_RELAYER_KEY;
+    return k ? Keypair.fromSecretKey(Uint8Array.from(JSON.parse(k))) : null;
+  } catch {
+    return null;
+  }
+})();
+
+export interface RelicChainState {
+  /** Relic keys ("page-index") whose NFT exists. */
+  minted: Set<string>;
+  /** Relic keys whose owner is already committed to Solana (mintable). */
+  synced: Set<string>;
+}
+
+/** Which relics are minted, and which are committed to the base layer and can be minted. */
+export async function fetchRelicChainState(relics: P.Relic[]): Promise<RelicChainState> {
+  const minted = new Set<string>();
+  const synced = new Set<string>();
+  const pages = Array.from({ length: VAULT_PAGES }, (_, i) => P.vaultPda(i));
+  const [vaults, assets] = await Promise.all([
+    base.getMultipleAccountsInfo(pages).catch(() => [] as any[]),
+    relics.length ? base.getMultipleAccountsInfo(relics.map((r) => P.relicAssetPda(r.page, r.index))).catch(() => [] as any[]) : Promise.resolve([]),
+  ]);
+  relics.forEach((r, i) => {
+    if (assets[i]) minted.add(`${r.page}-${r.index}`);
+  });
+  for (const v of vaults) {
+    const d = v ? P.decodeVault(v.data) : null;
+    if (!d) continue;
+    for (const r of d.relics) synced.add(`${r.page}-${r.index}:${r.owner}`);
+  }
+  const ok = new Set<string>();
+  for (const r of relics) if (synced.has(`${r.page}-${r.index}:${r.owner}`)) ok.add(`${r.page}-${r.index}`);
+  return { minted, synced: ok };
+}
+
+/**
+ * Mints a vault relic as a Metaplex Core NFT to its owner. The sponsor PDA pays
+ * rent; the tx fee is paid by the devnet relayer, or by the player's wallet if
+ * the relayer is unavailable. Returns [signature, asset address].
+ */
+export async function claimRelic(r: P.Relic, wallet: Signer): Promise<[string, string]> {
+  const ix = P.ixMintRelic(r.page, r.index, new PublicKey(r.owner));
+  const relayerOk = RELAYER && (await base.getBalance(RELAYER.publicKey).catch(() => 0)) > 20_000;
+  const payer = relayerOk ? RELAYER!.publicKey : wallet.publicKey;
+  if (!relayerOk && (await base.getBalance(wallet.publicKey).catch(() => 0)) < 10_000) {
+    throw new Error("The claim sponsor is out of devnet SOL. Connect a wallet with a little devnet SOL to pay the fee.");
+  }
+  const { blockhash, lastValidBlockHeight } = await base.getLatestBlockhash("confirmed");
+  let tx = new Transaction({ feePayer: payer, blockhash, lastValidBlockHeight }).add(ix);
+  if (relayerOk) tx.partialSign(RELAYER!);
+  else tx = await wallet.signTransaction(tx);
+  const sig = await base.sendRawTransaction(tx.serialize(), { skipPreflight: false });
+  const res = await base.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  if (res.value.err) throw new Error(`Mint failed: ${JSON.stringify(res.value.err)}`);
+  return [sig, P.relicAssetPda(r.page, r.index).toBase58()];
+}
+
 /** Live room subscription used by both the lobby and the match. */
 export class RoomWatcher {
   latest: { world: World; bytes: Uint8Array; header: P.RoomHeader; at: number } | null = null;
