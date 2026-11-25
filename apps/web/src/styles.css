@@ -1510,3 +1510,70 @@ table.t tr.me td {
 .nft-tag:hover {
   color: #fff;
 }
+
+/* Verified replays */
+.replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.replay-row {
+  display: grid;
+  grid-template-columns: 80px 80px 1fr 150px 120px;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-image: var(--px-slot) 4 / 8px stretch;
+  border-style: solid;
+}
+.replay-row:hover {
+  border-image: var(--px-tag-gold) 2 / 4px stretch;
+}
+@media (max-width: 640px) {
+  .replay-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.replay-bar {
+  height: 12px;
+  margin-top: 10px;
+  border-image: var(--px-slot) 4 / 6px stretch;
+  border-style: solid;
+}
+.replay-bar > div {
+  height: 100%;
+  background: #4aa8ff;
+  transition: width 0.3s;
+}
+.replay-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  z-index: 20;
+  padding: 10px 14px !important;
+}
+.replay-badge {
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  border-style: solid;
+}
+.replay-badge.ok {
+  color: #5fd16b;
+  border-image: var(--px-tag-green) 2 / 4px stretch;
+}
+.replay-badge.bad {
+  color: #ff8a96;
+  border-image: var(--px-tag-blood) 2 / 4px stretch;
+}

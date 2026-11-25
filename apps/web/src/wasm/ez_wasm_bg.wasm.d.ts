@@ -1,10 +1,27 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_replay_free: (a: number, b: number) => void;
 export const __wbg_sim_free: (a: number, b: number) => void;
 export const angle_to: (a: number, b: number, c: number, d: number) => number;
 export const item_value: (a: number, b: number) => number;
 export const raw_to_compact: (a: number, b: number) => [number, number, number, number];
+export const replay_act_move: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const replay_begin: (a: number, b: number, c: number) => number;
+export const replay_bytes: (a: number) => [number, number];
+export const replay_chest: (a: number, b: number, c: number, d: number) => number;
+export const replay_combat: (a: number, b: number, c: number, d: number, e: number) => number;
+export const replay_interact: (a: number, b: number, c: number) => number;
+export const replay_join: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+export const replay_leave: (a: number, b: number, c: number) => number;
+export const replay_new: (a: number) => number;
+export const replay_phase: (a: number) => number;
+export const replay_seed: (a: number, b: number, c: number) => number;
+export const replay_set_class: (a: number, b: number, c: number, d: number) => number;
+export const replay_settle: (a: number) => number;
+export const replay_start: (a: number, b: number, c: number) => number;
+export const replay_tick: (a: number) => number;
+export const replay_tick_count: (a: number) => number;
 export const sim_act_combat: (a: number, b: number, c: number, d: number) => void;
 export const sim_act_move: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const sim_bytes: (a: number) => [number, number];

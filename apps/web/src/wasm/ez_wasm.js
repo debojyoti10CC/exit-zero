@@ -145,6 +145,194 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 
+const ReplayFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_replay_free(ptr >>> 0, 1));
+/**
+ * Re-runs a recorded on-chain match: every instruction the program applied to
+ * the room's world, in order, with the program's own bookkeeping (wallets and
+ * session keys). Each method mirrors one instruction handler and returns false
+ * where the program would have rejected the transaction.
+ */
+export class Replay {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ReplayFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_replay_free(ptr, 0);
+    }
+    /**
+     * @returns {number}
+     */
+    tick_count() {
+        const ret = wasm.replay_tick_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * World right after `reset` with this nonce (or room creation for nonce 0).
+     * @param {number} nonce
+     */
+    constructor(nonce) {
+        const ret = wasm.replay_new(nonce);
+        this.__wbg_ptr = ret >>> 0;
+        ReplayFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @param {Uint8Array} wallet
+     * @param {number} _class
+     * @param {Uint8Array} name
+     * @param {Uint8Array} session
+     * @returns {boolean}
+     */
+    join(wallet, _class, name, session) {
+        const ptr0 = passArray8ToWasm0(wallet, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(name, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_join(this.__wbg_ptr, ptr0, len0, _class, ptr1, len1, ptr2, len2);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} randomness
+     * @returns {boolean}
+     */
+    seed(randomness) {
+        const ptr0 = passArray8ToWasm0(randomness, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_seed(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * Steps the world when the program did (its receipt log says so).
+     * @returns {boolean}
+     */
+    tick() {
+        const ret = wasm.replay_tick(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @returns {boolean}
+     */
+    begin(session) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_begin(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * Compact encoding: hashed for receipts and decoded by the renderer.
+     * @returns {Uint8Array}
+     */
+    bytes() {
+        const ret = wasm.replay_bytes(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * @param {Uint8Array} randomness
+     * @param {number} chest
+     * @returns {boolean}
+     */
+    chest(randomness, chest) {
+        const ptr0 = passArray8ToWasm0(randomness, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_chest(this.__wbg_ptr, ptr0, len0, chest);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @returns {boolean}
+     */
+    leave(session) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_leave(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * @returns {number}
+     */
+    phase() {
+        const ret = wasm.replay_phase(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @returns {boolean}
+     */
+    start(session) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_start(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @param {number} kind
+     * @param {number} aim
+     * @returns {boolean}
+     */
+    combat(session, kind, aim) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_combat(this.__wbg_ptr, ptr0, len0, kind, aim);
+        return ret !== 0;
+    }
+    /**
+     * @returns {boolean}
+     */
+    settle() {
+        const ret = wasm.replay_settle(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @param {number} x
+     * @param {number} y
+     * @param {number} aim
+     * @param {number} moving
+     * @returns {boolean}
+     */
+    act_move(session, x, y, aim, moving) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_act_move(this.__wbg_ptr, ptr0, len0, x, y, aim, moving);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @returns {boolean}
+     */
+    interact(session) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_interact(this.__wbg_ptr, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * @param {Uint8Array} session
+     * @param {number} _class
+     * @returns {boolean}
+     */
+    set_class(session, _class) {
+        const ptr0 = passArray8ToWasm0(session, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.replay_set_class(this.__wbg_ptr, ptr0, len0, _class);
+        return ret !== 0;
+    }
+}
+
 const SimFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_sim_free(ptr >>> 0, 1));

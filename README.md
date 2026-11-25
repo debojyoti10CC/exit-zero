@@ -25,6 +25,7 @@ Measured on devnet: world tick ~26k CU (crank-driven, ~10/s), move ~15k CU, atta
 | **Determinism** | The dungeon is generated on-chain from the verified seed by `ez-core`. The same crate compiles to WASM, so anyone can re-derive the exact layout. |
 | **Settlement** | `settle` writes results to the delegated **Hall** (leaderboard) and **Vault** (relic ownership ledger), then commits all three accounts back to Solana. |
 | **Relics** | Rare, Epic and Legendary items you extract become relic records owned by your wallet (with the run's seed). `transfer_relic` moves them. |
+| **Verified replays** | After `begin`, every `tick` and at `settle` the program logs a receipt: the first 8 bytes of sha256 of the world. *Verified Replays* downloads every transaction of a match from the rollup (joins, VRF callbacks, moves, attacks, chests, ticks), re-applies them with the same Rust core compiled to WASM, checks every receipt byte-exact, then plays the match back in the game renderer with a timeline. |
 | **Relic NFTs** | `mint_relic` turns a vault relic into a **Metaplex Core** NFT in the *EXIT//ZERO Relics* collection, owned by the relic's owner, with rarity, run, crypt and VRF seed as on-chain attributes. The collection and every asset address are program PDAs (one mint per relic, no outside mints), and a sponsor PDA pays the rent, so claiming is free for players. |
 
 ## Repository layout

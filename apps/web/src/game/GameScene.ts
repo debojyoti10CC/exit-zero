@@ -427,7 +427,7 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(-200, -200, MAP_PX_W + 400, MAP_PX_H + 400);
     const me = w.players[this.me];
-    this.pred = { x: me.x, y: me.y };
+    this.pred = this.session.replay ? null : { x: me.x, y: me.y };
     cam.centerOn(px(me.x), px(me.y));
     this.revealAround(px(me.x), px(me.y), true);
   }
@@ -1102,9 +1102,9 @@ export class GameScene extends Phaser.Scene {
       fx += lx * 0.18;
       fy += ly * 0.18;
     } else {
-      // Spectate: follow a living player, else stay.
+      // Spectate: follow a living player, else stay (replays follow the chosen player).
       const alive = w.players.findIndex((p) => p.state === PS.ALIVE);
-      const target = alive >= 0 ? w.players[alive] : meP;
+      const target = this.session.replay && meP.state !== PS.EMPTY ? meP : alive >= 0 ? w.players[alive] : meP;
       fx = px(target.x);
       fy = px(target.y);
     }

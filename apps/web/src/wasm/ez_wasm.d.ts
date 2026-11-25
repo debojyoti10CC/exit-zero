@@ -12,6 +12,40 @@ export function raw_to_compact(raw: Uint8Array): Uint8Array;
  * Value of an item, for UI.
  */
 export function item_value(kind: number, rarity: number): number;
+/**
+ * Re-runs a recorded on-chain match: every instruction the program applied to
+ * the room's world, in order, with the program's own bookkeeping (wallets and
+ * session keys). Each method mirrors one instruction handler and returns false
+ * where the program would have rejected the transaction.
+ */
+export class Replay {
+  free(): void;
+  tick_count(): number;
+  /**
+   * World right after `reset` with this nonce (or room creation for nonce 0).
+   */
+  constructor(nonce: number);
+  join(wallet: Uint8Array, _class: number, name: Uint8Array, session: Uint8Array): boolean;
+  seed(randomness: Uint8Array): boolean;
+  /**
+   * Steps the world when the program did (its receipt log says so).
+   */
+  tick(): boolean;
+  begin(session: Uint8Array): boolean;
+  /**
+   * Compact encoding: hashed for receipts and decoded by the renderer.
+   */
+  bytes(): Uint8Array;
+  chest(randomness: Uint8Array, chest: number): boolean;
+  leave(session: Uint8Array): boolean;
+  phase(): number;
+  start(session: Uint8Array): boolean;
+  combat(session: Uint8Array, kind: number, aim: number): boolean;
+  settle(): boolean;
+  act_move(session: Uint8Array, x: number, y: number, aim: number, moving: number): boolean;
+  interact(session: Uint8Array): boolean;
+  set_class(session: Uint8Array, _class: number): boolean;
+}
 export class Sim {
   private constructor();
   free(): void;
@@ -82,10 +116,27 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly __wbg_replay_free: (a: number, b: number) => void;
   readonly __wbg_sim_free: (a: number, b: number) => void;
   readonly angle_to: (a: number, b: number, c: number, d: number) => number;
   readonly item_value: (a: number, b: number) => number;
   readonly raw_to_compact: (a: number, b: number) => [number, number, number, number];
+  readonly replay_act_move: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+  readonly replay_begin: (a: number, b: number, c: number) => number;
+  readonly replay_bytes: (a: number) => [number, number];
+  readonly replay_chest: (a: number, b: number, c: number, d: number) => number;
+  readonly replay_combat: (a: number, b: number, c: number, d: number, e: number) => number;
+  readonly replay_interact: (a: number, b: number, c: number) => number;
+  readonly replay_join: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+  readonly replay_leave: (a: number, b: number, c: number) => number;
+  readonly replay_new: (a: number) => number;
+  readonly replay_phase: (a: number) => number;
+  readonly replay_seed: (a: number, b: number, c: number) => number;
+  readonly replay_set_class: (a: number, b: number, c: number, d: number) => number;
+  readonly replay_settle: (a: number) => number;
+  readonly replay_start: (a: number, b: number, c: number) => number;
+  readonly replay_tick: (a: number) => number;
+  readonly replay_tick_count: (a: number) => number;
   readonly sim_act_combat: (a: number, b: number, c: number, d: number) => void;
   readonly sim_act_move: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly sim_bytes: (a: number) => [number, number];
