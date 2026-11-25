@@ -75,7 +75,7 @@ export function Logo() {
 // Title
 // ---------------------------------------------------------------------------
 
-export type TitlePick = "online" | "practice" | "hero" | "hall" | "vault" | "howto";
+export type TitlePick = "online" | "practice" | "hero" | "hall" | "vault" | "replays" | "howto";
 
 export function Title({ name, cls, onPick }: { name: string; cls: number; onPick: (p: TitlePick) => void }) {
   const items: { label: string; hint?: string; id: TitlePick }[] = [
@@ -84,6 +84,7 @@ export function Title({ name, cls, onPick }: { name: string; cls: number; onPick
     { label: "Adventurer", hint: CLASSES[cls].name, id: "hero" },
     { label: "Hall of Fame", id: "hall" },
     { label: "Relic Vault", id: "vault" },
+    { label: "Verified Replays", id: "replays" },
     { label: "How to Play", id: "howto" },
   ];
   return (

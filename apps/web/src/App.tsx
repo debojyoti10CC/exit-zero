@@ -10,6 +10,7 @@ import { awardRun, type RunAward } from "./game/progress";
 import type { ContractResult } from "./game/contracts";
 import { Sprite, ItemIcon, HERO_SPRITES } from "./ui/Sprites";
 import { Hud } from "./ui/Hud";
+import { Replays } from "./replay/ReplayView";
 import { createGame } from "./game/GameScene";
 import { PracticeSession, loadWasm, type GameSession } from "./game/session";
 import { hud } from "./game/hudStore";
@@ -25,7 +26,7 @@ import {
 import { erExplorer, accountExplorer, ER_RPC, PROGRAM_ID } from "./chain/config";
 import { relicAssetPda, type HallEntry, type Relic } from "./chain/program";
 
-type Screen = "menu" | "hero" | "practice" | "online" | "lobby" | "game" | "hall" | "vault" | "howto";
+type Screen = "menu" | "hero" | "practice" | "online" | "lobby" | "game" | "hall" | "vault" | "replays" | "howto";
 
 const LS = {
   get: (k: string, d: string) => {
@@ -169,6 +170,7 @@ export function App() {
       )}
       {screen === "hall" && <Hall go={go} identity={identity} />}
       {screen === "vault" && <Vault go={go} identity={identity} signer={signer} />}
+      {screen === "replays" && <Replays onBack={() => go("menu")} />}
       {screen === "howto" && <HowTo go={go} />}
     </>
   );

@@ -230,6 +230,7 @@ pub mod exit_zero {
         let mut data = info.try_borrow_mut_data()?;
         let world = world_of(&mut data)?;
         sim::begin(&mut *world).map_err(sim_err)?;
+        log_receipt("b", world.nonce, &*world);
         room.last_tick_slot = Clock::get()?.slot;
         Ok(())
     }
@@ -273,6 +274,7 @@ pub mod exit_zero {
         }
         room.last_tick_slot = slot;
         sim::tick(&mut *world);
+        log_receipt("t", world.tick, &*world);
         Ok(())
     }
 
@@ -383,6 +385,7 @@ pub mod exit_zero {
             }
         }
         world.settled = 1;
+        log_receipt("s", world.nonce, &*world);
         drop(data);
 
         // Serialize before handing the accounts to the commit intent.
@@ -579,6 +582,17 @@ pub mod exit_zero {
 // ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
+
+/// Replay receipt: logs the first 8 bytes of sha256(compact world encoding).
+/// The browser replay re-simulates every input with the same core (WASM) and
+/// must reproduce each receipt byte-exact. `b` = begin (nonce), `t` = tick, `s` = settle (nonce).
+fn log_receipt(tag: &str, n: u32, world: &World) {
+    let mut buf = vec![0u8; ez_core::codec::WORLD_SIZE];
+    if world.write_to(&mut buf) {
+        let h = solana_sha256_hasher::hash(&buf).to_bytes();
+        msg!("xz:{} {} {:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}", tag, n, h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]);
+    }
+}
 
 fn push_str(out: &mut Vec<u8>, s: &str) {
     out.extend_from_slice(&(s.len() as u32).to_le_bytes());

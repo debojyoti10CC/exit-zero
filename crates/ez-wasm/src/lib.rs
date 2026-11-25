@@ -174,6 +174,160 @@ impl Sim {
     }
 }
 
+/// Re-runs a recorded on-chain match: every instruction the program applied to
+/// the room's world, in order, with the program's own bookkeeping (wallets and
+/// session keys). Each method mirrors one instruction handler and returns false
+/// where the program would have rejected the transaction.
+#[wasm_bindgen]
+pub struct Replay {
+    w: World,
+    wallets: [[u8; 32]; MAX_PLAYERS],
+    sessions: [[u8; 32]; MAX_PLAYERS],
+}
+
+fn key32(b: &[u8]) -> [u8; 32] {
+    let mut k = [0u8; 32];
+    if b.len() == 32 {
+        k.copy_from_slice(b);
+    }
+    k
+}
+
+#[wasm_bindgen]
+impl Replay {
+    /// World right after `reset` with this nonce (or room creation for nonce 0).
+    #[wasm_bindgen(constructor)]
+    pub fn new(nonce: u32) -> Replay {
+        let mut w = World::default();
+        w.reset(nonce);
+        Replay { w, wallets: [[0; 32]; MAX_PLAYERS], sessions: [[0; 32]; MAX_PLAYERS] }
+    }
+
+    fn slot(&self, session: &[u8]) -> Option<u8> {
+        let s = key32(session);
+        (0..MAX_PLAYERS).find(|&i| self.sessions[i] == s && self.wallets[i] != [0; 32]).map(|i| i as u8)
+    }
+
+    pub fn join(&mut self, wallet: &[u8], class: u8, name: &[u8], session: &[u8]) -> bool {
+        let wk = key32(wallet);
+        if let Some(i) = self.wallets.iter().position(|w| *w == wk) {
+            self.sessions[i] = key32(session);
+            if self.w.phase == PHASE_LOBBY {
+                return sim::set_class(&mut self.w, i as u8, class).is_ok();
+            }
+            return true;
+        }
+        let mut n = [0u8; NAME_LEN];
+        for (i, b) in name.iter().take(NAME_LEN).enumerate() {
+            n[i] = if (b' '..=b'~').contains(b) { *b } else { 0 };
+        }
+        match sim::join(&mut self.w, class, n) {
+            Ok(slot) => {
+                self.wallets[slot as usize] = wk;
+                self.sessions[slot as usize] = key32(session);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    pub fn set_class(&mut self, session: &[u8], class: u8) -> bool {
+        match self.slot(session) {
+            Some(p) => sim::set_class(&mut self.w, p, class).is_ok(),
+            None => false,
+        }
+    }
+
+    pub fn leave(&mut self, session: &[u8]) -> bool {
+        let Some(p) = self.slot(session) else { return false };
+        if sim::leave(&mut self.w, p).is_err() {
+            return false;
+        }
+        self.wallets[p as usize] = [0; 32];
+        self.sessions[p as usize] = [0; 32];
+        true
+    }
+
+    pub fn start(&mut self, session: &[u8]) -> bool {
+        let Some(p) = self.slot(session) else { return false };
+        let w = &mut self.w;
+        if !(w.phase == PHASE_LOBBY || (w.phase == PHASE_SEEDING && w.seed_src == 0)) || w.host != p {
+            return false;
+        }
+        w.phase = PHASE_SEEDING;
+        w.seed_src = 0;
+        true
+    }
+
+    pub fn seed(&mut self, randomness: &[u8]) -> bool {
+        if self.w.phase != PHASE_SEEDING || randomness.len() != 32 {
+            return false;
+        }
+        sim::set_seed(&mut self.w, key32(randomness), 1);
+        true
+    }
+
+    pub fn begin(&mut self, session: &[u8]) -> bool {
+        self.slot(session).is_some() && sim::begin(&mut self.w).is_ok()
+    }
+
+    /// Steps the world when the program did (its receipt log says so).
+    pub fn tick(&mut self) -> bool {
+        if self.w.phase != PHASE_RUNNING {
+            return false;
+        }
+        sim::tick(&mut self.w);
+        true
+    }
+
+    pub fn act_move(&mut self, session: &[u8], x: i32, y: i32, aim: u8, moving: u8) -> bool {
+        let Some(p) = self.slot(session) else { return false };
+        sim::act(&mut self.w, p, Action::Move { x, y, aim, moving }).is_ok()
+    }
+
+    pub fn combat(&mut self, session: &[u8], kind: u8, aim: u8) -> bool {
+        let Some(p) = self.slot(session) else { return false };
+        let a = match kind {
+            0 => Action::Attack { aim },
+            1 => Action::Special { aim },
+            2 => Action::Dodge { aim },
+            3 => Action::Potion,
+            _ => return false,
+        };
+        sim::act(&mut self.w, p, a).is_ok()
+    }
+
+    pub fn interact(&mut self, session: &[u8]) -> bool {
+        let Some(p) = self.slot(session) else { return false };
+        sim::act(&mut self.w, p, Action::Interact).is_ok()
+    }
+
+    pub fn chest(&mut self, randomness: &[u8], chest: u8) -> bool {
+        randomness.len() == 32 && sim::resolve_chest(&mut self.w, chest, &key32(randomness)).is_ok()
+    }
+
+    pub fn settle(&mut self) -> bool {
+        if self.w.phase != PHASE_ENDED || self.w.settled != 0 {
+            return false;
+        }
+        self.w.settled = 1;
+        true
+    }
+
+    /// Compact encoding: hashed for receipts and decoded by the renderer.
+    pub fn bytes(&self) -> Vec<u8> {
+        self.w.encode()
+    }
+
+    pub fn tick_count(&self) -> u32 {
+        self.w.tick
+    }
+
+    pub fn phase(&self) -> u8 {
+        self.w.phase
+    }
+}
+
 /// Byte angle from a to b (matches the on-chain math exactly).
 #[wasm_bindgen]
 pub fn angle_to(ax: i32, ay: i32, bx: i32, by: i32) -> u8 {

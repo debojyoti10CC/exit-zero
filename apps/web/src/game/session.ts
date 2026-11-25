@@ -32,6 +32,8 @@ export interface Snapshot {
 export interface GameSession {
   readonly mode: "practice" | "online";
   readonly me: number;
+  /** Replays play back recorded snapshots: no prediction, no input. */
+  readonly replay?: boolean;
   latest: Snapshot | null;
   stats: ChainStats | null;
   onSnapshot(cb: (s: Snapshot) => void): () => void;
