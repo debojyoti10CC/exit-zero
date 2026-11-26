@@ -46,6 +46,8 @@ for (let i = 0; i < end; i++) {
 
 console.log("Rendering soundtrack…");
 const wav = await page.evaluate(() => window.__trailer.audio());
+const logo = await page.evaluate(() => window.__trailer.logo?.());
+if (logo) fs.writeFileSync(path.join(OUT, "logo.png"), Buffer.from(logo.split(",")[1], "base64"));
 fs.writeFileSync(path.join(OUT, "soundtrack.wav"), Buffer.from(wav, "base64"));
 await browser.close();
 

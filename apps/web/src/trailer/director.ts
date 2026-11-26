@@ -11,6 +11,9 @@ import { makeTown, TOWN_W, TOWN_H } from "../ui/SpiritTownScene";
 import { TILE, World, CHEST, CHEST_STATE, ROOM, MON, ITEM, EXTRACT_TICKS } from "../game/world";
 import { renderSoundtrack } from "./soundtrack";
 
+// ?trailer&clean renders plates only (no captions, bars, flashes or title text) for
+// compositing in an editor such as HyperFrames; __trailer.logo() exports the lockup.
+const CLEAN = new URLSearchParams(location.search).has("clean");
 export const FPS = 30;
 export const DURATION = 20;
 export const FRAMES = FPS * DURATION;
@@ -539,6 +542,7 @@ function drawTitle(t: number) {
   cx2d.fillStyle = "rgba(3,4,10,0.5)";
   cx2d.fillRect(0, 0, CW, CH);
   vignette();
+  if (CLEAN) return;
   if (lt < 0) {
     // One frame of black before the slam, matching the silence in the score.
     cx2d.fillStyle = "#000";
@@ -631,7 +635,7 @@ async function frame(i: number): Promise<string> {
     const w = TOWN_W * (0.8 - e * 0.32);
     const h = TOWN_H * (0.8 - e * 0.32);
     drawTownCrop(t, (TOWN_W - w) / 2, (TOWN_H - h) * 0.25, w, h);
-    letterbox();
+    if (!CLEAN) letterbox();
   } else if (shot.kind === "game") {
     stepGame(shot, t - shot.start);
     const g = stage!.g;
@@ -653,13 +657,46 @@ async function frame(i: number): Promise<string> {
       } else flash = null;
     }
     vignette();
-    letterbox();
+    if (!CLEAN) letterbox();
   } else {
     drawTitle(t);
   }
-  if (shot.caption) drawCaption(shot.caption, t);
-  if (shot.kind !== "title") punch(t, shot);
+  if (shot.caption && !CLEAN) drawCaption(shot.caption, t);
+  if (shot.kind !== "title" && !CLEAN) punch(t, shot);
   return comp.toDataURL("image/png");
+}
+
+/** The EXIT//ZERO lockup on a transparent canvas, as a PNG data URL. */
+function logoPng(size = 208): string {
+  const c = document.createElement("canvas");
+  const x2 = c.getContext("2d")!;
+  x2.font = `${size}px Silkscreen`;
+  const parts: [string, string][] = [
+    ["EXIT", "#f2f6ff"],
+    ["//", "#e0283c"],
+    ["ZERO", "#9fe0ff"],
+  ];
+  const widths = parts.map(([p]) => x2.measureText(p).width);
+  const pad = Math.ceil(size * 0.2);
+  c.width = Math.ceil(widths.reduce((a, b) => a + b, 0) + pad * 2);
+  c.height = Math.ceil(size * 1.25 + pad * 2);
+  x2.font = `${size}px Silkscreen`;
+  x2.textAlign = "left";
+  x2.textBaseline = "middle";
+  x2.lineJoin = "miter";
+  let x = pad;
+  const y = c.height / 2;
+  parts.forEach(([p, col], i) => {
+    x2.lineWidth = size / 7;
+    x2.strokeStyle = "#05050a";
+    x2.strokeText(p, x, y);
+    x2.fillStyle = "#0d1c33";
+    x2.fillText(p, x + size / 12, y + size / 12);
+    x2.fillStyle = col;
+    x2.fillText(p, x, y);
+    x += widths[i];
+  });
+  return c.toDataURL("image/png");
 }
 
 export async function bootTrailer() {
@@ -683,6 +720,6 @@ export async function bootTrailer() {
   gameHost.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px;z-index:1";
   document.body.appendChild(gameHost);
   await new Promise((r) => setTimeout(r, 400));
-  (window as any).__trailer = { frame, FRAMES, FPS, audio: () => renderSoundtrack(DURATION, SHOTS.map((s) => s.start), SLAM, BEAT) };
+  (window as any).__trailer = { frame, FRAMES, FPS, audio: () => renderSoundtrack(DURATION, SHOTS.map((s) => s.start), SLAM, BEAT), logo: () => logoPng() };
   (window as any).__trailerReady = true;
 }
