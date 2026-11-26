@@ -1,9 +1,9 @@
-// Trailer renderer. Open /?trailer and drive window.__trailer.frame(i) for i in
-// 0..FRAMES-1 (scripts/render-trailer.mjs does this headless). Every frame is
-// real gameplay rendered by the game itself, stepped on a virtual clock.
+// 3D trailer renderer. Open /?trailer and drive window.__trailer.frame(i) for i in
+// 0..FRAMES-1 (scripts/render-trailer.mjs does this headless). Every frame is real
+// gameplay: the practice simulation (the same Rust core the chain runs) rendered by
+// the 3D renderer, stepped on a virtual clock, filmed with scripted camera moves.
 
-import type Phaser from "phaser";
-import { createGame, GameScene } from "../game/GameScene";
+import { createGame, Game3D } from "../game/Game3D";
 import { PracticeSession, loadWasm } from "../game/session";
 import { sfx } from "../game/audio";
 import { installPixelKit } from "../ui/pixelKit";
@@ -14,25 +14,36 @@ import { renderSoundtrack } from "./soundtrack";
 export const FPS = 30;
 export const DURATION = 20;
 export const FRAMES = FPS * DURATION;
+// Logical 960x540 layout, composited at 2x (true 1080p output).
 const CW = 960;
 const CH = 540;
+const SCALE = 2;
 const BAR = 46;
+const U = 1 / TILE;
+const PITCH = (56 * Math.PI) / 180;
 
 // ---------------------------------------------------------------------------
-// Virtual clock: the game, its tweens and interpolation all read this.
+// Virtual clock: the renderer, its effects and interpolation all read this.
 // ---------------------------------------------------------------------------
-// Starts far above real time: each shot boots Phaser on the real clock first, and
-// timers set then must never look like they are in the future.
 let vt = 1e9;
 const realNow = performance.now.bind(performance);
 (performance as any).now = () => vt;
 
 interface Caption {
   text: string;
+  sub?: string;
   from: number;
   to: number;
   color?: string;
   size?: number;
+}
+
+/** Camera rig for a shot at local time lt: distance, tilt offset and target offset (tiles). */
+interface Rig {
+  dist: number;
+  tilt?: number;
+  ox?: number;
+  oz?: number;
 }
 
 interface Shot {
@@ -44,20 +55,21 @@ interface Shot {
   bots?: number;
   setup?: (s: Stage) => void;
   direct?: (s: Stage, lt: number) => void;
-  zoom?: number;
+  rig?: (lt: number, len: number) => Rig;
 }
 
 interface Stage {
   session: PracticeSession;
   sim: any;
-  game: Phaser.Game;
-  scene: GameScene;
+  g: Game3D;
   w: () => World;
   vars: Record<string, any>;
 }
 
+const ease = (k: number) => (k < 0 ? 0 : k > 1 ? 1 : k * k * (3 - 2 * k));
+
 // ---------------------------------------------------------------------------
-// Helpers for staging
+// Staging helpers
 // ---------------------------------------------------------------------------
 function roomFor(w: World, pick: (r: World["rooms"][number]) => boolean) {
   for (let i = 0; i < w.roomCount; i++) if (pick(w.rooms[i])) return w.rooms[i];
@@ -65,12 +77,11 @@ function roomFor(w: World, pick: (r: World["rooms"][number]) => boolean) {
 }
 const center = (r: World["rooms"][number]) => ({ x: (r.x + r.w / 2) * TILE, y: (r.y + r.h / 2) * TILE });
 
+/** Points the hero's aim at a world position (units) through the renderer's own mouse ray. */
 function aimAt(s: Stage, wx: number, wy: number) {
-  const cam = s.scene.cameras.main;
-  const v = cam.worldView;
-  const px = ((wx / 16) - v.x) * cam.zoom;
-  const py = ((wy / 16) - v.y) * cam.zoom;
-  s.scene.input.activePointer.position.set(px, py);
+  const [sx, sy] = s.g.toScreen(wx * U, 0.5, wy * U);
+  s.g.mouse.x = sx;
+  s.g.mouse.y = sy;
 }
 
 function nearestMonster(s: Stage) {
@@ -90,35 +101,36 @@ function nearestMonster(s: Stage) {
 }
 
 function walk(s: Stage, tx: number, ty: number, stop = 120) {
-  const sc = s.scene;
-  const p = sc.pred!;
-  (["W", "A", "S", "D"] as const).forEach((k) => (sc.keys[k].isDown = false));
+  const g = s.g;
+  const p = g.pred!;
+  for (const k of ["KeyW", "KeyA", "KeyS", "KeyD"]) g.keys.delete(k);
   const dx = tx - p.x;
   const dy = ty - p.y;
   if (Math.hypot(dx, dy) < stop) return;
-  if (dx > 30) sc.keys.D.isDown = true;
-  if (dx < -30) sc.keys.A.isDown = true;
-  if (dy > 30) sc.keys.S.isDown = true;
-  if (dy < -30) sc.keys.W.isDown = true;
+  if (dx > 30) g.keys.add("KeyD");
+  if (dx < -30) g.keys.add("KeyA");
+  if (dy > 30) g.keys.add("KeyS");
+  if (dy < -30) g.keys.add("KeyW");
 }
 
 function attack(s: Stage) {
-  s.scene.nextAtk = 0;
-  s.scene.doAttack();
+  s.g.nextAtk = 0;
+  s.g.doAttack();
 }
 
 // ---------------------------------------------------------------------------
-// The edit (20s)
+// The edit (20 s)
 // ---------------------------------------------------------------------------
 const SHOTS: Shot[] = [
-  { start: 0, end: 2.0, kind: "town", caption: { text: "THE DEAD HUNGER", from: 0.35, to: 1.95 } },
+  { start: 0, end: 1.6, kind: "town", caption: { text: "THE DEAD HUNGER", from: 0.3, to: 1.55 } },
   {
-    start: 2.0,
-    end: 5.0,
+    // Reaper carves through a skeleton pack: slow push-in from high to low.
+    start: 1.6,
+    end: 4.4,
     kind: "game",
     cls: 0,
-    zoom: 3.4,
-    caption: { text: "CUT THEM DOWN", from: 2.25, to: 4.9 },
+    caption: { text: "CUT THEM DOWN", sub: "3 classes · real-time combat · every hit runs on-chain", from: 1.85, to: 4.3 },
+    rig: (lt, len) => ({ dist: 14.5 - ease(lt / len) * 3, tilt: -0.05 * ease(lt / len), ox: 0.8 }),
     setup: (s) => {
       const w = s.w();
       const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 8 && r.h >= 6);
@@ -126,7 +138,7 @@ const SHOTS: Shot[] = [
       s.sim.t_clear_monsters(0, 0, -1);
       s.sim.t_place(0, c.x - TILE * 2, c.y);
       s.sim.t_hp(0, 999, 999);
-      for (const [dx, dy] of [[1.6, -1.2], [2.4, 0.6], [1.2, 1.6], [3.4, -0.4]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, true, 0);
+      for (const [dx, dy] of [[1.6, -1.2], [2.4, 0.6], [1.2, 1.6], [3.4, -0.4], [2.8, 1.8]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, true, 0);
       s.sim.t_spawn(MON.NECRO, c.x + TILE * 4.5, c.y - TILE * 1.5, true, 0);
       s.vars.c = c;
     },
@@ -136,19 +148,21 @@ const SHOTS: Shot[] = [
         aimAt(s, n.m.x, n.m.y);
         walk(s, n.m.x, n.m.y, 330);
         attack(s);
-        if (lt > 1.4 && !s.vars.spec) {
+        if (lt > 1.2 && !s.vars.spec) {
           s.vars.spec = true;
-          s.scene.doSpecial();
+          s.g.doSpecial();
         }
       } else walk(s, s.vars.c.x + TILE * 3, s.vars.c.y);
     },
   },
   {
-    start: 5.0,
-    end: 7.0,
+    // Spellbinder's blue-flame orb detonates in a pack: wide, then a crash zoom.
+    start: 4.4,
+    end: 6.4,
     kind: "game",
     cls: 1,
-    zoom: 3.2,
+    caption: { text: "BURN THE HORDE", sub: "spells, blinks and bloom-lit 3D crypts", from: 4.6, to: 6.3, color: "#9fe0ff" },
+    rig: (lt) => ({ dist: lt < 0.55 ? 15 : 15 - ease((lt - 0.55) / 0.35) * 4, ox: 1.2 }),
     setup: (s) => {
       const w = s.w();
       const r = roomFor(w, (r) => r.kind !== ROOM.ENTRANCE && r.kind !== ROOM.BOSS && r.w >= 8);
@@ -156,17 +170,17 @@ const SHOTS: Shot[] = [
       s.sim.t_clear_monsters(0, 0, -1);
       s.sim.t_place(0, c.x - TILE * 3, c.y);
       s.sim.t_hp(0, 999, 999);
-      for (const [dx, dy] of [[1.0, 0], [1.6, -0.8], [1.6, 0.8], [2.2, 0]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, false, 255);
+      for (const [dx, dy] of [[1.0, 0], [1.6, -0.8], [1.6, 0.8], [2.2, 0], [2.6, -0.6]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, false, 255);
       s.vars.c = c;
     },
     direct: (s, lt) => {
       const c = s.vars.c;
-      aimAt(s, c.x + TILE * 1.5, c.y);
+      aimAt(s, c.x + TILE * 1.6, c.y);
       if (lt > 0.15 && !s.vars.fb) {
         s.vars.fb = true;
-        s.scene.doSpecial();
+        s.g.doSpecial();
       }
-      if (lt > 0.9) {
+      if (lt > 0.95) {
         const n = nearestMonster(s);
         if (n) aimAt(s, n.m.x, n.m.y);
         attack(s);
@@ -174,12 +188,13 @@ const SHOTS: Shot[] = [
     },
   },
   {
-    start: 7.0,
-    end: 9.0,
+    // Shade cracks a gold chest: close crane down onto the legendary drop.
+    start: 6.4,
+    end: 8.6,
     kind: "game",
     cls: 2,
-    zoom: 3.8,
-    caption: { text: "CLAIM LEGENDARY RELICS", from: 7.3, to: 8.95, color: "#ffcf5a" },
+    caption: { text: "LOOT LEGENDARY RELICS", sub: "every chest roll is MagicBlock VRF · relics mint as NFTs", from: 6.65, to: 8.5, color: "#ffcf5a" },
+    rig: (lt, len) => ({ dist: 11 - ease(lt / len) * 3, tilt: 0.05 - ease(lt / len) * 0.08, ox: 0.6, oz: -0.4 }),
     setup: (s) => {
       const w = s.w();
       let ci = w.chests.findIndex((c) => (c.tx || c.ty) && c.tier === CHEST.GOLD && c.state === CHEST_STATE.CLOSED);
@@ -196,7 +211,10 @@ const SHOTS: Shot[] = [
     direct: (s, lt) => {
       walk(s, s.vars.cx - 230, s.vars.cy + 30, 60);
       aimAt(s, s.vars.cx, s.vars.cy);
-      if (lt > 0.3 && !(s.vars.chest >= 0)) s.vars.chest = s.sim.interact(0);
+      if (lt > 0.3 && !(s.vars.chest >= 0)) {
+        const c = s.sim.interact(0);
+        if (c >= 0) s.vars.chest = c;
+      }
       if (lt > 0.75 && !s.vars.open && s.vars.chest >= 0) {
         s.vars.open = true;
         const r = new Uint8Array(32);
@@ -208,13 +226,14 @@ const SHOTS: Shot[] = [
     },
   },
   {
-    start: 9.0,
-    end: 11.5,
+    // A rival grabs for the idol; the Shade blinks behind him.
+    start: 8.6,
+    end: 10.8,
     kind: "game",
     cls: 2,
     bots: 1,
-    zoom: 3.6,
-    caption: { text: "TRUST NO ONE", from: 9.9, to: 11.45, color: "#e0283c", size: 52 },
+    caption: { text: "TRUST NO ONE", sub: "4-player PvP · kill a rival, take everything", from: 9.3, to: 10.75, color: "#e0283c", size: 52 },
+    rig: (lt) => ({ dist: 11.5 - ease(lt / 0.9) * 1.5, ox: -1.1 }),
     setup: (s) => {
       const w = s.w();
       const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 7);
@@ -230,20 +249,21 @@ const SHOTS: Shot[] = [
     direct: (s, lt) => {
       const rival = s.w().players[1];
       aimAt(s, rival.x, rival.y);
-      if (lt > 0.55 && !s.vars.blink) {
+      if (lt > 0.5 && !s.vars.blink) {
         s.vars.blink = true;
-        s.scene.doSpecial();
+        s.g.doSpecial();
       }
-      if (lt > 0.75) attack(s);
+      if (lt > 0.7) attack(s);
     },
   },
   {
-    start: 11.5,
-    end: 14.0,
+    // The Hollow King: low push toward the boss, then a crane pull-back.
+    start: 10.8,
+    end: 13.4,
     kind: "game",
     cls: 0,
-    zoom: 2.6,
-    caption: { text: "FACE THE HOLLOW KING", from: 11.8, to: 13.95 },
+    caption: { text: "FACE THE HOLLOW KING", sub: "elites, a boss and a crypt that collapses", from: 11.05, to: 13.3 },
+    rig: (lt, len) => ({ dist: 9 + ease(lt / len) * 6, tilt: -0.08 + ease(lt / len) * 0.1, oz: -1.2 }),
     setup: (s) => {
       const w = s.w();
       const bi = w.bossIdx;
@@ -263,12 +283,13 @@ const SHOTS: Shot[] = [
     },
   },
   {
-    start: 14.0,
-    end: 16.0,
+    // Extraction: crane up as the beam takes the hero.
+    start: 13.4,
+    end: 15.6,
     kind: "game",
     cls: 0,
-    zoom: 3.4,
-    caption: { text: "CROSS OVER ALIVE", from: 14.25, to: 15.85, color: "#9fe0ff" },
+    caption: { text: "ESCAPE ALIVE", sub: "only what you carry out is yours", from: 13.6, to: 15.5, color: "#9fe0ff" },
+    rig: (lt, len) => ({ dist: 8 + ease(lt / len) * 8, tilt: 0.08 * ease(lt / len) }),
     setup: (s) => {
       const w = s.w();
       const po = w.portals.find((p) => p.tx || p.ty)!;
@@ -279,13 +300,13 @@ const SHOTS: Shot[] = [
       s.sim.t_place(0, px, py + 40);
       s.sim.t_hp(0, 999, 999);
       // Channel most of the escape before the cut so the beam lands on screen.
-      for (let i = 0; i < 24; i++) (s.session as any).step();
+      for (let i = 0; i < 22; i++) (s.session as any).step();
       s.vars.px = px;
       s.vars.py = py;
     },
     direct: (s) => aimAt(s, s.vars.px + 300, s.vars.py - 100),
   },
-  { start: 16.0, end: 20.0, kind: "title" },
+  { start: 15.6, end: 20.0, kind: "title" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -299,8 +320,9 @@ let gameHost: HTMLDivElement;
 let stage: Stage | null = null;
 let current = -1;
 let simAcc = 0;
+let flash: { color: string; alpha: number; ms: number; at: number } | null = null;
 
-async function waitFor(cond: () => boolean, ms = 20000) {
+async function waitFor(cond: () => boolean, ms = 30000) {
   const t0 = realNow();
   while (!cond()) {
     if (realNow() - t0 > ms) throw new Error("trailer: timed out waiting");
@@ -312,34 +334,51 @@ async function startGameShot(shot: Shot) {
   stopGame();
   const session = await PracticeSession.create(shot.cls ?? 0, ["Reaper", "Spellbinder", "Shade"][shot.cls ?? 0], shot.bots ?? 0, true);
   clearInterval((session as any).timer); // we step the simulation ourselves
-  const game = createGame(gameHost, session, { onEnd: () => {}, onPauseToggle: () => {} });
-  // Let Phaser boot and build the map with the real loop, then freeze it.
-  await waitFor(() => {
-    const sc = game.scene.getScene("game") as GameScene | null;
-    return !!sc && (sc as any).built;
-  });
-  game.loop.sleep();
-  const scene = game.scene.getScene("game") as GameScene;
+  const g = createGame(gameHost, session, { onEnd: () => {}, onPauseToggle: () => {} });
+  // Render the 3D layer at 1280x720 for a crisp 1080p master.
+  g.renderer.setSize(1280, 720, false);
+  g.composer.setSize(1280, 720);
+  // Let the renderer load its atlas and build the map, then take over its clock.
+  await waitFor(() => g.built);
+  cancelAnimationFrame(g.raf);
+  g.loop = () => {};
+  // Screen flashes are CSS transitions on real time: replay them on the virtual clock.
+  g.screenFlash = (color: string, alpha: number, ms: number) => {
+    flash = { color, alpha, ms, at: vt };
+  };
   const sim = (session as any).sim;
-  stage = { session, sim, game, scene, w: () => scene.world!, vars: {} };
+  stage = { session, sim, g, w: () => g.world!, vars: {} };
   shot.setup?.(stage);
-  // Publish the staged world, settle the camera on the hero.
   (session as any).publish();
-  scene.pred = { x: scene.world!.players[0].x, y: scene.world!.players[0].y };
-  scene.cameras.main.setZoom(shot.zoom ?? 3);
-  const me = scene.world!.players[0];
-  scene.cameras.main.centerOn(me.x / 16, me.y / 16);
+  const me = g.world!.players[0];
+  g.pred = { x: me.x, y: me.y };
+  g.camTarget.set(me.x * U, 0, me.y * U);
+  // Camera rig for this shot.
+  const rig = shot.rig;
+  const len = shot.end - shot.start;
+  g.placeCamera = (tx: number, tz: number, sx: number, sz: number) => {
+    const lt = Math.max(0, (vt - stage!.vars.t0) / 1000);
+    const r = rig ? rig(lt, len) : { dist: 13 };
+    const p = PITCH + (r.tilt ?? 0);
+    const x = tx + (r.ox ?? 0) + sx;
+    const z = tz + (r.oz ?? 0) + sz;
+    g.camera.position.set(x, Math.sin(p) * r.dist, z + Math.cos(p) * r.dist);
+    g.camera.lookAt(x, 0, z);
+  };
+  stage.vars.t0 = vt;
   for (let i = 0; i < 3; i++) {
     vt += 1000 / FPS;
-    game.step(vt, 1000 / FPS);
+    g.update(vt, 1000 / FPS);
   }
+  stage.vars.t0 = vt;
   simAcc = 0;
+  flash = null;
 }
 
 function stopGame() {
   if (!stage) return;
   stage.session.destroy();
-  stage.game.destroy(true);
+  stage.g.destroy();
   stage = null;
 }
 
@@ -352,7 +391,7 @@ function stepGame(shot: Shot, lt: number) {
     simAcc -= 100;
     (s.session as any).step();
   }
-  s.game.step(vt, 1000 / FPS);
+  s.g.update(vt, 1000 / FPS);
 }
 
 // ---- drawing helpers --------------------------------------------------------
@@ -381,14 +420,18 @@ function drawCaption(cap: Caption, t: number) {
   const a = Math.max(0, Math.min(1, Math.min(k, out)));
   const size = cap.size ?? 42;
   const slide = Math.max(0, 1 - k) * 24;
-  // Crimson slash behind the words.
+  const y = CH - BAR - (cap.sub ? 58 : 42);
   cx2d.save();
   cx2d.globalAlpha = a * 0.9;
   cx2d.fillStyle = "#a0142a";
   const w = cap.text.length * size * 0.72 + 60;
-  cx2d.fillRect(CW / 2 - w / 2 - slide, CH - BAR - 74, w, 6);
+  cx2d.fillRect(CW / 2 - w / 2 - slide, y - 32, w, 6);
   cx2d.restore();
-  outlinedText(cap.text, CW / 2 + slide, CH - BAR - 42, size, cap.color ?? "#f2f6ff", "center", a);
+  outlinedText(cap.text, CW / 2 + slide, y, size, cap.color ?? "#f2f6ff", "center", a);
+  if (cap.sub) {
+    const sa = Math.max(0, Math.min(1, (t - cap.from - 0.2) / 0.2, out));
+    outlinedText(cap.sub.toUpperCase(), CW / 2, y + 38, 14, "#cfe8ff", "center", sa);
+  }
 }
 
 function letterbox() {
@@ -397,8 +440,15 @@ function letterbox() {
   cx2d.fillRect(0, CH - BAR, CW, BAR);
 }
 
+function vignette() {
+  const g = cx2d.createRadialGradient(CW / 2, CH / 2, CH * 0.35, CW / 2, CH / 2, CH * 0.95);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(2,1,8,0.8)");
+  cx2d.fillStyle = g;
+  cx2d.fillRect(0, 0, CW, CH);
+}
+
 function punch(t: number, shot: Shot) {
-  // Short zoom punch + flash on every cut.
   const lt = t - shot.start;
   if (lt < 0.1 && shot.start > 0) {
     cx2d.fillStyle = `rgba(255,255,255,${0.55 * (1 - lt / 0.1)})`;
@@ -413,20 +463,19 @@ function drawTownCrop(t: number, x: number, y: number, w: number, h: number, dim
 }
 
 function drawTitle(t: number) {
-  const lt = t - 16;
+  const lt = t - 15.6;
   const z = 1 + lt * 0.015;
   const w = TOWN_W / z;
   const h = TOWN_H / z;
   drawTownCrop(t, (TOWN_W - w) / 2, (TOWN_H - h) / 2, w, h, 0.5);
   cx2d.fillStyle = "rgba(3,4,10,0.35)";
   cx2d.fillRect(0, 0, CW, CH);
-  // Logo slam.
   const slam = Math.min(1, Math.max(0, (lt - 0.12) / 0.14));
   if (lt > 0.12) {
     const scale = 1 + (1 - slam) * 0.8;
     const shake = lt < 0.45 ? (Math.sin(lt * 90) * 6 * (0.45 - lt)) / 0.45 : 0;
     cx2d.save();
-    cx2d.translate(CW / 2 + shake, CH / 2 - 60);
+    cx2d.translate(CW / 2 + shake, CH / 2 - 78);
     cx2d.scale(scale, scale);
     const size = 96;
     cx2d.font = `${size}px Silkscreen`;
@@ -456,17 +505,22 @@ function drawTitle(t: number) {
     cx2d.fillStyle = `rgba(255,255,255,${0.8 * (1 - (lt - 0.12) / 0.18)})`;
     cx2d.fillRect(0, 0, CW, CH);
   }
-  if (lt > 0.75) outlinedText("CUT DOWN HOLLOWS · BETRAY RIVALS · CROSS OVER", CW / 2, CH / 2 + 22, 18, "#cfe8ff", "center", Math.min(1, (lt - 0.75) / 0.25));
-  if (lt > 1.3) {
-    const a = Math.min(1, (lt - 1.3) / 0.15);
-    const blink = lt < 1.8 && Math.floor(lt * 12) % 2 === 0 ? 0.4 : 1;
+  if (lt > 0.7) outlinedText("A 4-PLAYER 3D EXTRACTION CRAWLER", CW / 2, CH / 2 - 6, 20, "#cfe8ff", "center", Math.min(1, (lt - 0.7) / 0.25));
+  if (lt > 1.05) outlinedText("LOOT · BETRAY · ESCAPE BEFORE THE CRYPT COLLAPSES", CW / 2, CH / 2 + 22, 14, "#8a95b0", "center", Math.min(1, (lt - 1.05) / 0.25));
+  if (lt > 1.4) {
+    const a = Math.min(1, (lt - 1.4) / 0.15);
+    const blink = lt < 1.9 && Math.floor(lt * 12) % 2 === 0 ? 0.4 : 1;
     cx2d.fillStyle = `rgba(160,20,42,${0.92 * a})`;
-    cx2d.fillRect(CW / 2 - 190, CH / 2 + 62, 380, 56);
-    outlinedText("RELEASING SOON", CW / 2, CH / 2 + 90, 34, "#ffffff", "center", a * blink);
+    cx2d.fillRect(CW / 2 - 190, CH / 2 + 50, 380, 56);
+    outlinedText("RELEASING SOON", CW / 2, CH / 2 + 78, 34, "#ffffff", "center", a * blink);
   }
-  if (lt > 2.0) outlinedText("FULLY ON-CHAIN  ·  SOLANA × MAGICBLOCK EPHEMERAL ROLLUPS", CW / 2, CH - 46, 14, "#8a95b0", "center", Math.min(1, (lt - 2) / 0.3));
-  if (lt > 3.4) {
-    cx2d.fillStyle = `rgba(0,0,0,${Math.min(1, (lt - 3.4) / 0.6)})`;
+  if (lt > 2.0) {
+    const a = Math.min(1, (lt - 2) / 0.3);
+    outlinedText("FULLY ON-CHAIN · SOLANA × MAGICBLOCK EPHEMERAL ROLLUPS", CW / 2, CH - 64, 14, "#cfe8ff", "center", a);
+    outlinedText("VRF LOOT · RELIC NFTs · VERIFIED ON-CHAIN REPLAYS", CW / 2, CH - 42, 13, "#8a95b0", "center", a);
+  }
+  if (lt > 3.75) {
+    cx2d.fillStyle = `rgba(0,0,0,${Math.min(1, (lt - 3.75) / 0.6)})`;
     cx2d.fillRect(0, 0, CW, CH);
   }
 }
@@ -483,9 +537,9 @@ async function frame(i: number): Promise<string> {
     if (shot.kind === "game") await startGameShot(shot);
     else stopGame();
   }
+  cx2d.setTransform(SCALE, 0, 0, SCALE, 0, 0);
   cx2d.clearRect(0, 0, CW, CH);
   if (shot.kind === "town") {
-    // Slow push from the whole town to the moon behind the torii.
     const k = (t - shot.start) / (shot.end - shot.start);
     const e = 1 - Math.pow(1 - k, 2);
     const w = TOWN_W * (1 - e * 0.45);
@@ -494,11 +548,25 @@ async function frame(i: number): Promise<string> {
     letterbox();
   } else if (shot.kind === "game") {
     stepGame(shot, t - shot.start);
+    const g = stage!.g;
+    cx2d.imageSmoothingEnabled = true;
+    cx2d.filter = "saturate(0.95) contrast(1.06)";
+    cx2d.drawImage(g.renderer.domElement, 0, 0, CW, CH);
+    cx2d.filter = "none";
     cx2d.imageSmoothingEnabled = false;
-    cx2d.drawImage(stage!.game.canvas, 0, 0, CW, CH);
-    // Cold grade + vignette for a cinematic finish.
-    cx2d.fillStyle = "rgba(10,20,45,0.10)";
-    cx2d.fillRect(0, 0, CW, CH);
+    cx2d.drawImage(g.overlay, 0, 0, CW, CH);
+    if (flash) {
+      const k = (vt - flash.at) / flash.ms;
+      if (k < 1) {
+        cx2d.save();
+        cx2d.globalCompositeOperation = "screen";
+        cx2d.globalAlpha = flash.alpha * (1 - k);
+        cx2d.fillStyle = flash.color;
+        cx2d.fillRect(0, 0, CW, CH);
+        cx2d.restore();
+      } else flash = null;
+    }
+    vignette();
     letterbox();
   } else {
     drawTitle(t);
@@ -516,9 +584,9 @@ export async function bootTrailer() {
   await loadWasm();
   await Promise.all([document.fonts.load("32px Silkscreen"), document.fonts.load("16px 'Pixelify Sans'")]);
   comp = document.createElement("canvas");
-  comp.width = CW;
-  comp.height = CH;
-  comp.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px;z-index:10;image-rendering:pixelated";
+  comp.width = CW * SCALE;
+  comp.height = CH * SCALE;
+  comp.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px;z-index:10";
   document.body.appendChild(comp);
   cx2d = comp.getContext("2d")!;
   townCanvas = document.createElement("canvas");
@@ -528,7 +596,6 @@ export async function bootTrailer() {
   gameHost = document.createElement("div");
   gameHost.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px;z-index:1";
   document.body.appendChild(gameHost);
-  // Make sure the tileset is loaded before the town renders.
   await new Promise((r) => setTimeout(r, 400));
   (window as any).__trailer = { frame, FRAMES, FPS, audio: () => renderSoundtrack(DURATION, SHOTS.map((s) => s.start)) };
   (window as any).__trailerReady = true;
