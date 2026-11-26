@@ -53,6 +53,8 @@ interface Shot {
   start: number;
   end: number;
   kind: "town" | "game" | "title";
+  /** Continue the previous game shot's session (a cut inside one take): new rig, direct and setup. */
+  cont?: boolean;
   caption?: Caption;
   cls?: number;
   bots?: number;
@@ -341,6 +343,457 @@ const SHOTS: Shot[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// The 30 s launch edit (/?trailer&clean&cut=launch): plates for the HyperFrames film,
+// cut to the music's groove. The groove repeats every LC seconds (16 steps of LU);
+// the drop lands at LD. hit(n, step) is a kick: step 0, 4, 8, 12 or 14 of cycle n.
+// ---------------------------------------------------------------------------
+const LD = 7.72;
+const LC = 2.8305;
+const LU = LC / 16;
+const hit = (n: number, step = 0) => Math.round((LD + n * LC + step * LU) * 1000) / 1000;
+export const LAUNCH_DURATION = 30;
+export const LAUNCH_TITLE = hit(6);
+
+/** Puts a player's three squadmates in formation around them. */
+function formation(s: Stage) {
+  const p = s.g.pred!;
+  [[-1.3, 0.9], [1.3, 0.9], [0, 1.8]].forEach(([dx, dy], i) => s.sim.t_place(i + 1, Math.round(p.x + dx * TILE), Math.round(p.y + dy * TILE)));
+}
+
+const LAUNCH: Shot[] = [
+  // P1 "EVERY NIGHT," — the town under the moon.
+  { start: 0, end: hit(-2), kind: "town" },
+  {
+    // P2 "THE CRYPT WAKES." — Hollows rise one by one in a dark room.
+    start: hit(-2),
+    end: hit(-2, 8),
+    kind: "game",
+    cls: 0,
+    rig: (lt, len) => ({ dist: 10 - ease(lt / len) * 2, tilt: -0.12 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 8 && r.h >= 6);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x, c.y + TILE * 7);
+      s.sim.t_hp(0, 999, 999);
+      s.vars.c = c;
+      s.vars.focus = () => [c.x, c.y];
+      s.vars.focusMix = 1;
+    },
+    direct: (s, lt) => {
+      const c = s.vars.c;
+      const spots: [number, number, number][] = [[MON.SKELETON, -1.4, 0.4], [MON.NECRO, 0.2, -0.6], [MON.SKELETON, 1.5, 0.5], [MON.BRUTE, 0, 0.9]];
+      spots.forEach(([kind, dx, dy], i) => {
+        if (lt > 0.1 + i * 0.3 && !s.vars["w" + i]) {
+          s.vars["w" + i] = true;
+          s.sim.t_spawn(kind, c.x + dx * TILE, c.y + dy * TILE, false, 255);
+        }
+      });
+    },
+  },
+  {
+    // P3 "FOUR REAPERS GO IN." — the squad walks in together.
+    start: hit(-2, 8),
+    end: hit(-1),
+    kind: "game",
+    cls: 0,
+    bots: 3,
+    rig: (lt, len) => ({ dist: 10 + ease(lt / len) * 1.5, tilt: -0.06, oz: 0.2 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.ENTRANCE);
+      const c = center(r);
+      s.sim.t_clear_monsters(c.x, c.y, TILE * 12);
+      s.sim.t_place(0, c.x, c.y + TILE);
+      for (let i = 0; i < 4; i++) s.sim.t_hp(i, 999, 999);
+      s.g.pred = { x: c.x, y: c.y + TILE };
+      formation(s);
+      // Frame the middle of the squad, not the leader.
+      s.vars.focus = () => [s.g.pred!.x, s.g.pred!.y + TILE * 0.9];
+      s.vars.focusMix = 1;
+    },
+    direct: (s) => {
+      s.g.keys.add("KeyW");
+      aimAt(s, s.g.pred!.x, s.g.pred!.y - TILE * 3);
+      formation(s);
+    },
+  },
+  {
+    // P4 "NOT ALL COME BACK." — a Great Hollow and its pack close in; cut closer on the half bar.
+    start: hit(-1),
+    end: hit(0),
+    kind: "game",
+    cls: 0,
+    rig: (lt, len) => (lt < LC / 2 ? { dist: 13 - ease(lt / (LC / 2)) * 1.5, tilt: -0.06, oz: -0.4 } : { dist: 9.5 - ease((lt - LC / 2) / (len - LC / 2)) * 1.2, tilt: -0.1, oz: -0.8 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.h >= 7 && r.w >= 7);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x, c.y + TILE * 3.5);
+      s.sim.t_hp(0, 999, 999);
+      s.sim.t_spawn(MON.BRUTE, c.x, c.y - TILE * 3.2, true, 0);
+      for (const [dx, dy] of [[-1.8, -2.6], [1.8, -2.7], [-1.0, -4.0], [1.1, -4.1]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, true, 0);
+      s.vars.c = c;
+      s.vars.focus = () => {
+        const n = nearestMonster(s);
+        return n ? [n.m.x, n.m.y] : null;
+      };
+      s.vars.focusMix = 0.45;
+    },
+    direct: (s, lt) => {
+      const n = nearestMonster(s);
+      if (n) aimAt(s, n.m.x, n.m.y);
+      s.vars.focusMix = lt < LC / 2 ? 0.45 : 0.85;
+    },
+  },
+  {
+    // M1 "SLASH." — the drop: Reaper carves into a skeleton pack.
+    start: hit(0),
+    end: hit(0, 8),
+    kind: "game",
+    cls: 0,
+    rig: (lt, len) => ({ dist: 12.5 - ease(lt / len) * 1.5, ox: 0.8 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 8 && r.h >= 6);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x - TILE * 1.2, c.y);
+      s.sim.t_hp(0, 999, 999);
+      for (const [dx, dy] of [[0.9, -0.9], [1.4, 0.5], [0.6, 1.2], [2.4, -0.4], [2.0, 1.4], [2.8, 0.8], [3.2, -1.2]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, true, 0);
+      s.vars.c = c;
+    },
+    direct: (s) => {
+      const n = nearestMonster(s);
+      if (n) {
+        aimAt(s, n.m.x, n.m.y);
+        walk(s, n.m.x, n.m.y, 330);
+        attack(s);
+      }
+    },
+  },
+  {
+    // M2 — punch in as the Reaper spins (special) through the pack.
+    start: hit(0, 8),
+    end: hit(0, 12),
+    kind: "game",
+    cont: true,
+    rig: () => ({ dist: 8, tilt: -0.1, ox: 0.4 }),
+    direct: (s) => {
+      if (!s.vars.spec) {
+        s.vars.spec = true;
+        s.g.doSpecial();
+      }
+      const n = nearestMonster(s);
+      if (n) aimAt(s, n.m.x, n.m.y);
+      attack(s);
+    },
+  },
+  {
+    // M3 — the Spellbinder looses a blue-flame orb (wide).
+    start: hit(0, 12),
+    end: hit(1),
+    kind: "game",
+    cls: 1,
+    rig: () => ({ dist: 14, ox: 1.6 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind !== ROOM.ENTRANCE && r.kind !== ROOM.BOSS && r.w >= 8);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x - TILE * 3, c.y);
+      s.sim.t_hp(0, 999, 999);
+      for (const [dx, dy] of [[1.4, 0], [2.0, -0.8], [2.0, 0.8], [2.6, 0], [3.0, -0.6], [3.0, 0.7]]) s.sim.t_spawn(MON.SKELETON, c.x + dx * TILE, c.y + dy * TILE, false, 255);
+      s.vars.c = c;
+    },
+    direct: (s, lt) => {
+      aimAt(s, s.vars.c.x + TILE * 2, s.vars.c.y);
+      if (lt > 0.03 && !s.vars.fb) {
+        s.vars.fb = true;
+        s.g.doSpecial();
+      }
+    },
+  },
+  {
+    // M4 "BURN." — crash zoom onto the detonation.
+    start: hit(1),
+    end: hit(1, 8),
+    kind: "game",
+    cont: true,
+    rig: (lt) => ({ dist: 10.5 - ease(lt / 0.3) * 1.5, ox: 2.0 }),
+    direct: (s, lt) => {
+      if (lt > 0.5) {
+        const n = nearestMonster(s);
+        if (n) aimAt(s, n.m.x, n.m.y);
+        attack(s);
+      }
+    },
+  },
+  {
+    // M5 — a Great Hollow rears up over the Shade (low and close).
+    start: hit(1, 8),
+    end: hit(1, 12),
+    kind: "game",
+    cls: 2,
+    rig: () => ({ dist: 9.5, tilt: -0.08, oz: -0.9 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 7 && r.h >= 6);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x, c.y + TILE * 1.2);
+      s.sim.t_hp(0, 999, 999);
+      s.vars.bi = s.sim.t_spawn(MON.BRUTE, c.x, c.y - TILE * 0.3, true, 0);
+      // Let it close in and wind up before the cut.
+      for (let i = 0; i < 6; i++) (s.session as any).step();
+      s.vars.focus = () => {
+        const b = s.w().monsters[s.vars.bi];
+        return b && b.hp > 0 ? [b.x, b.y] : null;
+      };
+      s.vars.focusMix = 0.75;
+    },
+    direct: (s) => {
+      const b = s.w().monsters[s.vars.bi];
+      if (b) aimAt(s, b.x, b.y);
+    },
+  },
+  {
+    // M6 — the Shade blinks through it and cuts back (wider).
+    start: hit(1, 12),
+    end: hit(2),
+    kind: "game",
+    cont: true,
+    rig: () => ({ dist: 11.5, oz: -0.7 }),
+    direct: (s) => {
+      const b = s.w().monsters[s.vars.bi];
+      if (b) aimAt(s, b.x, b.y);
+      if (!s.vars.blink) {
+        s.vars.blink = true;
+        s.g.doSpecial();
+      }
+      attack(s);
+    },
+  },
+  {
+    // M7 "LOOT." — the Shade cracks a gold chest.
+    start: hit(2),
+    end: hit(2, 8),
+    kind: "game",
+    cls: 2,
+    rig: (lt, len) => ({ dist: 10.5 - ease(lt / len) * 1.5, tilt: 0.04, ox: 0.6, oz: -0.4 }),
+    setup: (s) => {
+      const w = s.w();
+      let ci = w.chests.findIndex((c) => (c.tx || c.ty) && c.tier === CHEST.GOLD && c.state === CHEST_STATE.CLOSED);
+      if (ci < 0) ci = w.chests.findIndex((c) => (c.tx || c.ty) && c.tier === CHEST.NORMAL);
+      const ch = w.chests[ci];
+      const cx = ch.tx * TILE + 128;
+      const cy = ch.ty * TILE + 128;
+      s.sim.t_clear_monsters(cx, cy, TILE * 12);
+      s.sim.t_place(0, cx - TILE * 1.05, cy + 30);
+      s.sim.t_hp(0, 999, 999);
+      s.vars.cx = cx;
+      s.vars.cy = cy;
+    },
+    direct: (s, lt) => {
+      walk(s, s.vars.cx - 230, s.vars.cy + 30, 60);
+      aimAt(s, s.vars.cx, s.vars.cy);
+      if (lt > 0.1 && !(s.vars.chest >= 0)) {
+        const c = s.sim.interact(0);
+        if (c >= 0) s.vars.chest = c;
+      }
+      if (lt > 0.45 && !s.vars.open && s.vars.chest >= 0) {
+        s.vars.open = true;
+        const r = new Uint8Array(32);
+        for (let i = 0; i < 32; i++) r[i] = (i * 73 + 41) & 255;
+        s.sim.resolve_chest(s.vars.chest, r);
+        s.sim.t_drop(ITEM.CROWN, 4, s.vars.cx + 120, s.vars.cy - 60);
+        s.sim.t_drop(ITEM.HEART, 3, s.vars.cx - 30, s.vars.cy - 150);
+      }
+    },
+  },
+  {
+    // M8 — crane down onto the legendary Moon Crown.
+    start: hit(2, 8),
+    end: hit(2, 12),
+    kind: "game",
+    cont: true,
+    rig: (lt, len) => ({ dist: 6.8 - ease(lt / len) * 0.6, tilt: -0.1 }),
+    setup: (s) => {
+      s.vars.focus = () => [s.vars.cx + 120, s.vars.cy - 60];
+      s.vars.focusMix = 1;
+    },
+    direct: (s) => aimAt(s, s.vars.cx + 120, s.vars.cy - 60),
+  },
+  {
+    // M9 — a rival reaches for the Hollow Mask.
+    start: hit(2, 12),
+    end: hit(3),
+    kind: "game",
+    cls: 2,
+    bots: 1,
+    rig: () => ({ dist: 9 }),
+    setup: (s) => {
+      const w = s.w();
+      const r = roomFor(w, (r) => r.kind === ROOM.NORMAL && r.w >= 7);
+      const c = center(r);
+      s.sim.t_clear_monsters(0, 0, -1);
+      s.sim.t_place(0, c.x - TILE * 1.8, c.y);
+      s.sim.t_place(1, c.x + TILE * 1.6, c.y + 20);
+      s.sim.t_hp(0, 999, 999);
+      s.sim.t_hp(1, 24, 110);
+      s.sim.t_drop(ITEM.IDOL, 3, c.x + TILE * 0.5, c.y - 40);
+      s.vars.c = c;
+      s.vars.rx = c.x + TILE * 1.6;
+      s.vars.focus = () => {
+        const rv = s.w().players[1];
+        return [rv.x, rv.y];
+      };
+      s.vars.focusMix = 0.75;
+    },
+    direct: (s) => {
+      // The rival edges toward the mask.
+      s.vars.rx -= 14;
+      s.sim.t_place(1, Math.round(s.vars.rx), s.vars.c.y + 20);
+      const rv = s.w().players[1];
+      aimAt(s, rv.x, rv.y);
+    },
+  },
+  {
+    // M10 "BETRAY." — the Shade blinks in and takes everything.
+    start: hit(3),
+    end: hit(3, 8),
+    kind: "game",
+    cont: true,
+    rig: (lt) => ({ dist: 10.5 - ease(lt / 0.8) * 1.2, oz: -0.5 }),
+    setup: (s) => {
+      s.vars.focusMix = 0.4;
+    },
+    direct: (s, lt) => {
+      const rv = s.w().players[1];
+      aimAt(s, rv.x, rv.y);
+      if (!s.vars.blink) {
+        s.vars.blink = true;
+        s.g.doSpecial();
+      }
+      if (lt > 0.15) attack(s);
+    },
+  },
+  {
+    // M11 — the spirit gates open (purple flash on the gate).
+    start: hit(3, 8),
+    end: hit(3, 12),
+    kind: "game",
+    cls: 1,
+    rig: () => ({ dist: 9.5, tilt: -0.06 }),
+    setup: (s) => {
+      const w = s.w();
+      const po = w.portals.find((p) => p.tx || p.ty)!;
+      const px = po.tx * TILE + 128;
+      const py = po.ty * TILE + 128;
+      s.sim.t_clear_monsters(px, py, TILE * 10);
+      s.sim.t_set_tick(w.portalTick - 2);
+      s.sim.t_place(0, px - TILE * 1.6, py + TILE * 1.4);
+      s.sim.t_hp(0, 999, 999);
+      s.vars.focus = () => [px, py];
+      s.vars.focusMix = 0.8;
+      s.vars.px = px;
+      s.vars.py = py;
+    },
+    direct: (s) => aimAt(s, s.vars.px, s.vars.py),
+  },
+  {
+    // M12 — low-angle reveal of the Hollow King.
+    start: hit(3, 12),
+    end: hit(4),
+    kind: "game",
+    cls: 0,
+    rig: (lt, len) => ({ dist: 10 - ease(lt / len) * 1, tilt: -0.1, oz: -1.6 }),
+    setup: (s) => {
+      const w = s.w();
+      const bi = w.bossIdx;
+      const b = w.monsters[bi];
+      s.sim.t_clear_monsters(b.x, b.y, TILE * 14);
+      s.sim.t_place(0, b.x - TILE * 0.4, b.y + TILE * 2.8);
+      s.sim.t_hp(0, 999, 999);
+      s.sim.t_spawn(MON.SKELETON, b.x - TILE * 2.2, b.y + TILE * 1.4, true, 0);
+      s.sim.t_spawn(MON.SKELETON, b.x + TILE * 2.4, b.y + TILE * 1.8, true, 0);
+      s.vars.bi = bi;
+      s.vars.focus = () => {
+        const m = s.w().monsters[bi];
+        return m && m.hp > 0 ? [m.x, m.y] : null;
+      };
+      s.vars.focusMix = 0.9;
+    },
+    direct: (s) => {
+      const b = s.w().monsters[s.vars.bi];
+      aimAt(s, b.x, b.y);
+    },
+  },
+  {
+    // M13 "FACE THE KING." — the fight, hero and boss in one frame.
+    start: hit(4),
+    end: hit(5),
+    kind: "game",
+    cont: true,
+    rig: (lt, len) => ({ dist: 12.5 + ease(lt / len) * 2.5, tilt: -0.02 + ease(lt / len) * 0.05, oz: -1.5 }),
+    setup: (s) => {
+      s.vars.focusMix = 0.65;
+    },
+    direct: (s) => {
+      const b = s.w().monsters[s.vars.bi];
+      aimAt(s, b.x, b.y);
+      walk(s, b.x, b.y + TILE * 1.6, 280);
+      attack(s);
+    },
+  },
+  {
+    // M14 "ESCAPE." — the beam takes the hero on the second kick.
+    start: hit(5),
+    end: hit(5, 8),
+    kind: "game",
+    cls: 0,
+    rig: (lt, len) => ({ dist: 9 + ease(lt / len) * 1.5, tilt: 0.02 }),
+    setup: (s) => {
+      const w = s.w();
+      const po = w.portals.find((p) => p.tx || p.ty)!;
+      const px = po.tx * TILE + 128;
+      const py = po.ty * TILE + 128;
+      s.sim.t_clear_monsters(px, py, TILE * 10);
+      s.sim.t_set_tick(w.portalTick - 1);
+      s.sim.t_place(0, px, py + 40);
+      s.sim.t_hp(0, 999, 999);
+      const sess = s.session as any;
+      for (let i = 0; i < 80; i++) {
+        sess.step();
+        if (sess.latest.world.players[0].extract >= EXTRACT_TICKS - 7) break;
+      }
+      s.vars.px = px;
+      s.vars.py = py;
+      s.vars.focus = () => [px, py];
+      s.vars.focusMix = 1;
+    },
+    direct: (s) => aimAt(s, s.vars.px + 300, s.vars.py - 100),
+  },
+  {
+    // M15 "KEEP WHAT YOU CARRY." — crane up off the empty gate.
+    start: hit(5, 8),
+    end: hit(6),
+    kind: "game",
+    cont: true,
+    rig: (lt, len) => ({ dist: 10.5 + ease(lt / len) * 5, tilt: 0.04 + ease(lt / len) * 0.08 }),
+  },
+  { start: LAUNCH_TITLE, end: LAUNCH_DURATION, kind: "title" },
+];
+
+// Which edit this page films.
+const IS_LAUNCH = new URLSearchParams(location.search).get("cut") === "launch";
+const SH = IS_LAUNCH ? LAUNCH : SHOTS;
+const DUR = IS_LAUNCH ? LAUNCH_DURATION : DURATION;
+const SLAM_T = IS_LAUNCH ? LAUNCH_TITLE + 0.1 : SLAM;
+
+// ---------------------------------------------------------------------------
 // Runtime
 // ---------------------------------------------------------------------------
 let comp: HTMLCanvasElement;
@@ -352,6 +805,7 @@ let stage: Stage | null = null;
 let current = -1;
 let simAcc = 0;
 let flash: { color: string; alpha: number; ms: number; at: number } | null = null;
+let activeShot: Shot;
 
 async function waitFor(cond: () => boolean, ms = 30000) {
   const t0 = realNow();
@@ -416,11 +870,11 @@ async function startGameShot(shot: Shot) {
   g.pred = { x: me.x, y: me.y };
   g.camTarget.set(me.x * U, 0, me.y * U);
   // Camera rig for this shot.
-  const rig = shot.rig;
-  const len = shot.end - shot.start;
+  activeShot = shot;
   g.placeCamera = (tx: number, tz: number, sx: number, sz: number) => {
     const lt = Math.max(0, (vt - stage!.vars.t0) / 1000);
-    const r = rig ? rig(lt, len) : { dist: 13 };
+    const rig = activeShot.rig;
+    const r = rig ? rig(lt, activeShot.end - activeShot.start) : { dist: 13 };
     const p = PITCH + (r.tilt ?? 0);
     // Optional focus point: blend the follow target toward it (e.g. hero + boss two-shot).
     const f = stage!.vars.focus?.();
@@ -534,7 +988,7 @@ function drawTownCrop(t: number, x: number, y: number, w: number, h: number, dim
 
 function drawTitle(t: number) {
   // Times relative to the logo slam; every beat below sits on the 0.4 s grid.
-  const lt = t - SLAM;
+  const lt = t - SLAM_T;
   const z = 1 + Math.max(0, lt) * 0.02;
   const w = TOWN_W / z;
   const h = TOWN_H / z;
@@ -608,7 +1062,7 @@ function drawTitle(t: number) {
     outlinedText("VRF LOOT · RELIC NFTs · VERIFIED ON-CHAIN REPLAYS", CW / 2, CH - BAR - 13, 14, "#b8c4dc", "center", a);
   }
   letterbox();
-  const out = DURATION - 0.8 - SLAM;
+  const out = DUR - 0.8 - SLAM_T;
   if (lt > out) {
     cx2d.fillStyle = `rgba(0,0,0,${Math.min(1, (lt - out) / 0.7)})`;
     cx2d.fillRect(0, 0, CW, CH);
@@ -620,11 +1074,16 @@ function drawTitle(t: number) {
 // ---------------------------------------------------------------------------
 async function frame(i: number): Promise<string> {
   const t = i / FPS;
-  const si = SHOTS.findIndex((s) => t >= s.start && t < s.end);
-  const shot = SHOTS[si < 0 ? SHOTS.length - 1 : si];
+  const si = SH.findIndex((s) => t >= s.start && t < s.end);
+  const shot = SH[si < 0 ? SH.length - 1 : si];
   if (si !== current) {
     current = si;
-    if (shot.kind === "game") await startGameShot(shot);
+    if (shot.kind === "game" && shot.cont && stage) {
+      // A cut inside the same take: keep the simulation, switch rig and direction.
+      activeShot = shot;
+      stage.vars.t0 = vt;
+      shot.setup?.(stage);
+    } else if (shot.kind === "game") await startGameShot(shot);
     else stopGame();
   }
   cx2d.setTransform(SCALE, 0, 0, SCALE, 0, 0);
@@ -720,6 +1179,6 @@ export async function bootTrailer() {
   gameHost.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px;z-index:1";
   document.body.appendChild(gameHost);
   await new Promise((r) => setTimeout(r, 400));
-  (window as any).__trailer = { frame, FRAMES, FPS, audio: () => renderSoundtrack(DURATION, SHOTS.map((s) => s.start), SLAM, BEAT), logo: () => logoPng() };
+  (window as any).__trailer = { frame, FRAMES: Math.round(FPS * DUR), FPS, audio: () => renderSoundtrack(DUR, SH.map((s) => s.start), SLAM_T, BEAT), logo: () => logoPng() };
   (window as any).__trailerReady = true;
 }
