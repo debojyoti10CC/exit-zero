@@ -1,9 +1,9 @@
 // Trailer soundtrack, synthesised offline: taiko, a pentatonic koto ostinato,
 // a dark pad, risers and a big logo slam. Returns a 16-bit WAV as base64.
+// The groove runs on the same beat grid as the edit, so every cut is a taiko hit.
+// Levels leave headroom; the encoder normalises to -14 LUFS / -1.5 dBTP.
 
 const SR = 44100;
-const BPM = 140;
-const BEAT = 60 / BPM;
 
 function noiseBuffer(ctx: BaseAudioContext, secs: number) {
   const b = ctx.createBuffer(1, Math.ceil(secs * SR), SR);
@@ -21,10 +21,10 @@ function impulse(ctx: BaseAudioContext, secs: number, decay: number) {
   return b;
 }
 
-export async function renderSoundtrack(duration: number, cuts: number[]): Promise<string> {
+export async function renderSoundtrack(duration: number, cuts: number[], SLAM: number, BEAT: number): Promise<string> {
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * SR), SR);
   const master = ctx.createGain();
-  master.gain.value = 0.9;
+  master.gain.value = 0.3; // headroom: stacked hits must not clip the 16-bit WAV
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -10;
   comp.ratio.value = 6;
@@ -38,8 +38,7 @@ export async function renderSoundtrack(duration: number, cuts: number[]): Promis
   verb.connect(verbGain).connect(master);
   const noise = noiseBuffer(ctx, 3);
 
-  const SLAM = 16.12; // logo slam
-  const DROP = 2.0; // groove starts with the first gameplay cut
+  const DROP = cuts.find((c) => c > 0) ?? BEAT * 3; // groove starts with the first gameplay cut
 
   // ---- instruments --------------------------------------------------------
   const taiko = (t: number, vol = 1, pitch = 1) => {
@@ -158,9 +157,12 @@ export async function renderSoundtrack(duration: number, cuts: number[]): Promis
 
   // ---- intro: lone koto + heartbeat taiko -----------------------------------
   const scale = [220, 233.1, 293.7, 329.6, 349.2, 440, 466.2, 587.3]; // A Bb D E F (in-scale)
-  [0.15, 0.55, 0.95, 1.35].forEach((t, i) => koto(t, scale[[0, 2, 3, 1][i]] / 2, 0.2));
-  taiko(0.0, 0.8, 0.8);
-  taiko(1.1, 0.5, 0.8);
+  // Cold open: a full-strength hit on frame 0, two pickups into the drop.
+  taiko(0.0, 1.4, 0.65);
+  whoosh(0.0, 0.25, 0.3);
+  taiko(BEAT * 1, 0.55, 0.85);
+  taiko(BEAT * 2, 0.7, 0.85);
+  [0, BEAT * 0.5, BEAT, BEAT * 1.5, BEAT * 2, BEAT * 2.5].forEach((t, i) => koto(t + 0.02, scale[[0, 2, 3, 1, 3, 4][i]] / 2, 0.2));
 
   // ---- groove: taiko pattern + koto ostinato from the first gameplay cut ----
   const barLen = BEAT * 4;
@@ -180,7 +182,7 @@ export async function renderSoundtrack(duration: number, cuts: number[]): Promis
 
   // ---- hits on every cut, whoosh into each caption -------------------------
   for (const c of cuts) {
-    if (c <= 0 || c >= SLAM) continue;
+    if (c <= 0 || c >= SLAM - 0.5) continue; // keep the pre-slam silence clean
     taiko(c, 1.2, 0.7);
     whoosh(c - 0.3, 0.3, 0.25);
   }
@@ -241,9 +243,11 @@ export async function renderSoundtrack(duration: number, cuts: number[]): Promis
     n.start(SLAM);
     n.stop(SLAM + 2);
   }
-  // "RELEASING SOON" accent + closing koto phrase
-  taiko(17.3, 0.9, 0.9);
-  [17.35, 17.6, 17.85, 18.3].forEach((t, i) => koto(t, scale[[5, 4, 3, 0][i]], 0.18));
+  // "PLAY NOW" accent + closing koto phrase
+  const REL = SLAM + BEAT * 3;
+  taiko(REL, 1.0, 0.9);
+  [REL, REL + BEAT * 0.5, REL + BEAT, REL + BEAT * 2].forEach((t, i) => koto(t + 0.02, scale[[5, 4, 3, 0][i]], 0.18));
+  taiko(SLAM + BEAT * 5, 0.6, 0.8);
 
   const buf = await ctx.startRendering();
   return wavBase64(buf);

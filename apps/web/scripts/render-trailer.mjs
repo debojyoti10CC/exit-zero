@@ -3,7 +3,7 @@
 // 1080p MP4. Usage: (dev server running) node scripts/render-trailer.mjs [outDir] [from] [to]
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { chromium } from "playwright-core";
 
 const URL = process.env.TRAILER_URL || "http://localhost:5173/?trailer";
@@ -50,7 +50,17 @@ fs.writeFileSync(path.join(OUT, "soundtrack.wav"), Buffer.from(wav, "base64"));
 await browser.close();
 
 if (FROM === 0 && end === total) {
-  const mp4 = path.join(OUT, "exit-zero-trailer.mp4");
+  const name = process.env.TRAILER_NAME || "exit-zero-trailer";
+  const mp4 = path.join(OUT, `${name}.mp4`);
+  const wavIn = path.join(OUT, "soundtrack.wav");
+  // Two-pass loudness normalisation: -14 LUFS integrated, true peak under -1 dBTP.
+  const target = "I=-14:TP=-1.5:LRA=11";
+  const r = (() => {
+    const res = loudnormReport(["-hide_banner", "-nostats", "-i", wavIn, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"]);
+    return JSON.parse(res.slice(res.lastIndexOf("{"), res.lastIndexOf("}") + 1));
+  })();
+  const af = `loudnorm=${target}:measured_I=${r.input_i}:measured_TP=${r.input_tp}:measured_LRA=${r.input_lra}:measured_thresh=${r.input_thresh}:offset=${r.target_offset}:linear=true,alimiter=limit=0.8:attack=1:release=50:level=false,aresample=48000`;
+  console.log("Loudness in:", r.input_i, "LUFS,", r.input_tp, "dBTP");
   console.log("Encoding", mp4);
   execFileSync(
     "ffmpeg",
@@ -58,14 +68,22 @@ if (FROM === 0 && end === total) {
       "-y",
       "-framerate", String(fps),
       "-i", path.join(FRAMES_DIR, "f%04d.png"),
-      "-i", path.join(OUT, "soundtrack.wav"),
+      "-i", wavIn,
       "-vf", "scale=1920:1080:flags=neighbor",
+      "-af", af,
       "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p", "-tune", "animation",
       "-c:a", "aac", "-b:a", "192k",
-      "-shortest", "-movflags", "+faststart",
+      "-t", String(total / fps),
+      "-movflags", "+faststart",
       mp4,
     ],
     { stdio: "inherit" },
   );
   console.log("Done:", mp4);
+}
+
+// ffmpeg prints its loudnorm report on stderr.
+function loudnormReport(args) {
+  const res = spawnSync("ffmpeg", args, { encoding: "utf8" });
+  return res.stderr;
 }
